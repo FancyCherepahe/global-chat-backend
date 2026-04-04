@@ -12,7 +12,7 @@ app.get('/', (req, res) => {
 app.use(express.static('public'));
 
 // Simple API route
-app.get('/api/hello', (req, res) => {
+app.get('/api/messages', (req, res) => {
   res.json({ message: 'Hello from GlobalChat backend!' });
 });
 
