@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Global Chat</title>
+        <link rel="stylesheet" href="styles.css">
+        <link rel="icon" type="image/png" href="images/logo.png">
+    </head>
+    <body> 
+        <header>
+        <div class="header">
+            <img src="images/logo.png" alt="Company Logo" class="logo">
+        </div>
+        <div class="nav-links">
+            <p class="nav-link">HOME</p>
+            <p class="nav-link">GLOBAL CHAT</p>
+            <p class="nav-link"><a class="nav-link" href="https://murder-drones-site-remastered-ut60.onrender.com/mini-game.html">MINI GAME</a></p>
+        </div>
+    </header>
+    <main>
+        <h1 class="title">Global Chat</h1>
+        <h3 class="subtitle">The easiest way to talk with the murder drones community</h3>
+        <div class="sign-in-form">
+            <h2 class="form-title">Sign In Form</h2>
+            <div class="info-input-div">
+                <input type="text" placeholder="Your name" class="info-input" id="username">
+                <input type="password" placeholder="Password" class="info-input" id="password">
+            </div>
+            <div class="stock-pfp-div">
+                <h2 class="form-subtitle form-title">Choose The Stock Profile Picture</h2>
+                <div class="stock-pfp-image-div"> 
+                    <img src="images/stock-pfp/uzi-pfp.png" alt="Stock Avatar 1" class="stock-pfp" id="stock-pfp-choose">
+                    <p class="stock-pfp-text">More</p>
+                </div>   
+            </div>
+            <div class="button-div">
+                <button id="sign-in" class="info-input" onclick="signInLastSavedAccount(); showGlobalChat()">Sign In On Last Account</button>
+                <button id="create-account" class="info-input" onclick="saveUserData()">Create An Account</button>
+            </div>
+        </div>
+    </main>
+    </body>
+    <footer>
+        <script src="script.js " defer></script>
+        <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    </footer>
+</html>
