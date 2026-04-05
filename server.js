@@ -4,6 +4,8 @@ const { Server } = require('socket.io');
 
 const app = express();
 
+let chatHistory = []
+
 // Serve static files if needed (frontend build)
 app.use(express.static('public'));
 
@@ -26,11 +28,17 @@ const io = new Server(server, {
 // Handle chat connections
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+  socket.emit("chat history", chatHistory.slice(-100));
 
   socket.on('chat message', (data) => {
     
     // broadcast to all clients
     io.emit('chat message', data);
+    
+    chatHistory.push(data);
+    if (chatHistory.length > 1000) {
+      chatHistory.shift();
+    }
   });
 
   socket.on('disconnect', () => {
