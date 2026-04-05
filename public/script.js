@@ -183,7 +183,7 @@ function showGlobalChat() {
 
 }
 
-const socket = io("https://global-chat-backend-9oz2.onrender.com");
+const socket = io();
 
 function sendMessage(inputElement) {
   const message = inputElement.value.trim();
