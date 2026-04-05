@@ -28,7 +28,7 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('chat message', (data) => {
-    data = { username, pfpLink, message}
+    
     // broadcast to all clients
     io.emit('chat message', data);
   });
