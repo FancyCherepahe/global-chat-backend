@@ -18,7 +18,7 @@ const server = http.createServer(app);
 // Attach Socket.IO for chat
 const io = new Server(server, {
   cors: {
-    origin: "*", // replace with your frontend URL on Render
+    origin: ["http://localhost:3000", "https://global-chat-uq6r.onrender.com/"], // replace with your frontend URL on Render
     methods: ["GET", "POST"]
   }
 });

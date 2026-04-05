@@ -152,7 +152,7 @@ function showGlobalChat() {
         globalChatDiv.style.animation = "fadeIn 0.7s forwards";
     }, 700);
 
-    socket.on("chat message", (msg) => {
+    socket.on("chat message", (data) => {
         const msgDiv = document.createElement("div");
         
         const savedUsername = localStorage.getItem("username");
