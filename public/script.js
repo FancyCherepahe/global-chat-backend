@@ -1,5 +1,6 @@
 const morePfp = document.querySelector("#stock-pfp-choose");
 const signInForm = document.querySelector(".sign-in-form");
+const socket = io();
 
 const allPfp = [{link: "images/stock-pfp/uzi-pfp.png", text: "UZI", text_color: "#080741", id: 1},
                 {link: "images/stock-pfp/n-pfp.png", text: "SD-N", text_color: "#51FF00", id: 2},
@@ -153,37 +154,47 @@ function showGlobalChat() {
     }, 700);
 
     socket.on("chat message", (data) => {
-        const msgDiv = document.createElement("div");
         
-        const savedUsername = localStorage.getItem("username");
-            const msgUsername = document.createElement("h2");
-        msgUsername.textContent = data.username;
-        msgUsername.className = "message-username";
-        
-        const savedPfpLink = localStorage.getItem("pfpLink");
-            const msgPfp = document.createElement("img");
-        msgPfp.src = data.pfpLink;
-        msgPfp.className = "message-pfp";
-        msgDiv.appendChild(msgPfp);
-            const msgText = document.createElement("p");
-            msgText.textContent = data.message;
-        msgText.className = "message-text";
-        const msgTextDiv = document.createElement("div");
-        msgTextDiv.className = "message-text-div";
-        msgTextDiv.appendChild(msgUsername);
-        msgTextDiv.appendChild(msgText);
-        msgDiv.appendChild(msgTextDiv);
-        
-       
-        
-        msgDiv.className = "message";
+            renderMessage(data);
 
-        document.getElementById("messages").appendChild(msgDiv);
+        });
+    socket.on("chat history", (history) => {
+        history.forEach((data) => {
+            renderMessage(data);
+        });
+
 });
 
+function renderMessage(data) {
+    const msgDiv = document.createElement("div");
+            
+            const savedUsername = localStorage.getItem("username");
+                const msgUsername = document.createElement("h2");
+            msgUsername.textContent = data.username;
+            msgUsername.className = "message-username";
+            
+            const savedPfpLink = localStorage.getItem("pfpLink");
+                const msgPfp = document.createElement("img");
+            msgPfp.src = data.pfpLink;
+            msgPfp.className = "message-pfp";
+            msgDiv.appendChild(msgPfp);
+                const msgText = document.createElement("p");
+                msgText.textContent = data.message;
+            msgText.className = "message-text";
+            const msgTextDiv = document.createElement("div");
+            msgTextDiv.className = "message-text-div";
+            msgTextDiv.appendChild(msgUsername);
+            msgTextDiv.appendChild(msgText);
+            msgDiv.appendChild(msgTextDiv);
+            
+        
+            
+            msgDiv.className = "message";
+
+            document.getElementById("messages").appendChild(msgDiv);
 }
 
-const socket = io();
+
 
 function sendMessage(inputElement) {
   const message = inputElement.value.trim();
@@ -201,4 +212,4 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
         sendMessage(document.getElementById("messageInput"));
     }
-});
+})};
