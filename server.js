@@ -4,10 +4,6 @@ const { Server } = require('socket.io');
 
 const app = express();
 
-app.get('/', (req, res) => {
-  res.send('GlobalChat backend is running!');
-});
-
 // Serve static files if needed (frontend build)
 app.use(express.static('public'));
 
