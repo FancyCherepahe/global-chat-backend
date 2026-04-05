@@ -157,16 +157,16 @@ function showGlobalChat() {
         
         const savedUsername = localStorage.getItem("username");
             const msgUsername = document.createElement("h2");
-        msgUsername.textContent = savedUsername;
+        msgUsername.textContent = data.username;
         msgUsername.className = "message-username";
         
         const savedPfpLink = localStorage.getItem("pfpLink");
             const msgPfp = document.createElement("img");
-        msgPfp.src = savedPfpLink;
+        msgPfp.src = data.pfpLink;
         msgPfp.className = "message-pfp";
         msgDiv.appendChild(msgPfp);
             const msgText = document.createElement("p");
-            msgText.textContent = msg;
+            msgText.textContent = data.message;
         msgText.className = "message-text";
         const msgTextDiv = document.createElement("div");
         msgTextDiv.className = "message-text-div";
@@ -188,7 +188,11 @@ const socket = io("https://global-chat-backend-9oz2.onrender.com");
 function sendMessage(inputElement) {
   const message = inputElement.value.trim();
   if (message) {
-    socket.emit("chat message", message); 
+    socket.emit("chat message", {
+        username: localStorage.getItem("username"),
+        pfpLink: localStorage.getItem("pfpLink"),
+        message
+    }); 
     inputElement.value = "";
   }
 }

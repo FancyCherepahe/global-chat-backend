@@ -27,10 +27,10 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('chat message', (msg) => {
-    console.log('Message:', msg);
+  socket.on('chat message', (data) => {
+    data = { username, pfpLink, message}
     // broadcast to all clients
-    io.emit('chat message', msg);
+    io.emit('chat message', data);
   });
 
   socket.on('disconnect', () => {
