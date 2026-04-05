@@ -1,3 +1,4 @@
+const cron = require('node-cron');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -28,26 +29,33 @@ const io = new Server(server, {
 // Handle chat connections
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
-  socket.emit("chat history", chatHistory.slice(-100));
+
+  socket.on("request history", () => {
+    socket.emit("chat history", chatHistory.slice(-100));
+  });
 
   socket.on('chat message', (data) => {
-    
-    // broadcast to all clients
     io.emit('chat message', data);
-    
     chatHistory.push(data);
-    if (chatHistory.length > 1000) {
-      chatHistory.shift();
-    }
+    if (chatHistory.length > 1000) chatHistory.shift();
   });
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
-});
+  
 
+});
+cron.schedule('0 0 * * *', () => {
+  chatHistory = [];
+  io.emit("system message", { text: "Chat history cleared for the new day" });
+  console.log("Chat history reset");
+},{timezone: 'UTC'});
 // Render sets PORT automatically
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}, link to local host: http://localhost:${PORT}`);
 });
+
+
+

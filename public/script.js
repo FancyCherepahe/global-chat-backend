@@ -2,6 +2,8 @@ const morePfp = document.querySelector("#stock-pfp-choose");
 const signInForm = document.querySelector(".sign-in-form");
 const socket = io();
 
+const main = document.querySelector("main");
+
 const allPfp = [{link: "images/stock-pfp/uzi-pfp.png", text: "UZI", text_color: "#080741", id: 1},
                 {link: "images/stock-pfp/n-pfp.png", text: "SD-N", text_color: "#51FF00", id: 2},
                 {link: "images/stock-pfp/v-pfp.png", text: "SD-V", text_color: "#00FFF2", id: 3},
@@ -54,7 +56,7 @@ function showOnPage() {
             allPfpCanvas.appendChild(pfpDiv);
            
         });
-        document.body.appendChild(allPfpCanvas);
+        main.appendChild(allPfpCanvas);
 signInForm.style.animation = "fadeOut 0.7s forwards";
     setTimeout(() => {
         signInForm.style.display = "none";
@@ -103,68 +105,6 @@ function signInLastSavedAccount() {
     }
 }
 
-function showGlobalChat() {
-    const allMessagesDiv = document.createElement("div");
-    allMessagesDiv.className = "all-messages";
-    allMessagesDiv.id = "messages";
-    
-    const savedAccountDiv = document.createElement("div");
-    savedAccountDiv.className = "account-info";
-    const savedUsername = document.createElement("h1");
-    savedUsername.textContent = localStorage.getItem("username");
-    savedUsername.className = "account-username";
-    savedAccountDiv.appendChild(savedUsername);
-    const savedPfp = document.createElement("img");    
-    savedPfp.className = "account-pfp";
-    savedPfp.src = localStorage.getItem("pfpLink");
-    savedAccountDiv.appendChild(savedPfp);
-    const globalChatDiv = document.createElement("div");
-    globalChatDiv.className = "global-chat";
-    globalChatDiv.appendChild(allMessagesDiv);
-    
-    const messageInput = document.createElement("input");
-    messageInput.type = "text";
-    messageInput.placeholder = "Type here";
-    messageInput.className = "info-input";
-    messageInput.id = "messageInput";
-    
-    const sendButton = document.createElement("button");
-    const sendIcon = document.createElement("img");
-    sendIcon.src = "images/Vector.png";
-    sendIcon.className = "send-icon";
-    sendButton.appendChild(sendIcon);
-    sendButton.className = "send-message-button";
-    sendButton.addEventListener("click",  () => sendMessage(messageInput));
-
-    const uiDiv = document.createElement("div");
-    uiDiv.appendChild(messageInput);
-    uiDiv.appendChild(sendButton);
-    uiDiv.className = "chat-ui";
-    globalChatDiv.appendChild(uiDiv);
-
-    const main = document.querySelector("main");
-
-    main.appendChild(savedAccountDiv);
-    main.appendChild(globalChatDiv);
-    signInForm.style.animation = "fadeOut 0.7s forwards";
-    setTimeout(() => {
-        signInForm.style.display = "none";
-        signInForm.style.animation = "none";
-        globalChatDiv.style.animation = "fadeIn 0.7s forwards";
-    }, 700);
-
-    socket.on("chat message", (data) => {
-        
-            renderMessage(data);
-
-        });
-    socket.on("chat history", (history) => {
-        history.forEach((data) => {
-            renderMessage(data);
-        });
-
-});
-
 function renderMessage(data) {
     const msgDiv = document.createElement("div");
             
@@ -195,6 +135,99 @@ function renderMessage(data) {
 }
 
 
+function showGlobalChat() {
+    const allMessagesDiv = document.createElement("div");
+    allMessagesDiv.className = "all-messages";
+    allMessagesDiv.id = "messages";
+    
+    const savedAccountDiv = document.createElement("div");
+    savedAccountDiv.className = "account-info";
+    const savedUsername = document.createElement("h1");
+    savedUsername.textContent = localStorage.getItem("username");
+    savedUsername.className = "account-username";
+    savedAccountDiv.appendChild(savedUsername);
+    const savedPfp = document.createElement("img");    
+    savedPfp.className = "account-pfp";
+    savedPfp.src = localStorage.getItem("pfpLink");
+    savedAccountDiv.appendChild(savedPfp);
+    const globalChatDiv = document.createElement("div");
+    globalChatDiv.className = "global-chat";
+    globalChatDiv.appendChild(allMessagesDiv);
+
+    const rulesAndSystemInfoDiv = document.createElement("div");
+    rulesAndSystemInfoDiv.className = "rules-system-info-div";
+    const rulesTitle = document.createElement("h1");
+    rulesTitle.textContent = "Rules And Info ";
+    rulesTitle.className = "rules-title";
+    rulesTitle.addEventListener("click", () => {
+        ruleAndInfoList.style.display = ruleAndInfoList.style.display === "none" ? "block" : "none";
+    });
+    const ruleAndInfoList = document.createElement("ul");
+    const rulesAndInfo = ["Be respectful to others", "No spamming or flooding the chat", "No hate speech or offensive language", "No sharing of personal information", "Follow the moderators' instructions", "Have fun and enjoy chatting!", "Chat history resets every 24 hours at midnight UTC"];
+    ruleAndInfoList.className = "rules-info-list";
+    ruleAndInfoList.style.listStyleType = "numbers";
+    ruleAndInfoList.style.display = "none";
+    rulesAndInfo.forEach((rule) => {
+        const ruleItem = document.createElement("li");
+        ruleItem.textContent = rule;
+        ruleAndInfoList.appendChild(ruleItem);
+    });
+    rulesAndSystemInfoDiv.appendChild(rulesTitle);
+    rulesAndSystemInfoDiv.appendChild(ruleAndInfoList);
+
+    const messageInput = document.createElement("input");
+    messageInput.type = "text";
+    messageInput.placeholder = "Type here";
+    messageInput.className = "info-input";
+    messageInput.id = "messageInput";
+    
+    const sendButton = document.createElement("button");
+    const sendIcon = document.createElement("img");
+    sendIcon.src = "images/Vector.png";
+    sendIcon.className = "send-icon";
+    sendButton.appendChild(sendIcon);
+    sendButton.className = "send-message-button";
+    sendButton.addEventListener("click",  () => sendMessage(messageInput));
+
+    const uiDiv = document.createElement("div");
+    uiDiv.appendChild(messageInput);
+    uiDiv.appendChild(sendButton);
+    uiDiv.className = "chat-ui";
+    globalChatDiv.appendChild(uiDiv);
+
+    
+
+    main.appendChild(savedAccountDiv);
+    main.appendChild(rulesAndSystemInfoDiv);
+    main.appendChild(globalChatDiv);
+    signInForm.style.animation = "fadeOut 0.7s forwards";
+    setTimeout(() => {
+        signInForm.style.display = "none";
+        signInForm.style.animation = "none";
+        globalChatDiv.style.animation = "fadeIn 0.7s forwards";
+    }, 700);
+
+    
+    socket.on("chat message", (data) => {
+        renderMessage(data);
+    });
+    
+    socket.on("chat history", (history) => {
+    history.forEach((data) => {
+        renderMessage(data);
+    });
+    socket.on("system message", (data) => {
+  const msgDiv = document.createElement("div");
+  msgDiv.className = "system-message";
+  msgDiv.textContent = data.text;
+  document.getElementById("messages").appendChild(msgDiv);
+});
+});
+socket.emit("request history");
+};
+
+
+
 
 function sendMessage(inputElement) {
   const message = inputElement.value.trim();
@@ -212,4 +245,8 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
         sendMessage(document.getElementById("messageInput"));
     }
-})};
+});
+
+
+
+
