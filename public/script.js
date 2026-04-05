@@ -78,6 +78,7 @@ function saveUserData() {
         localStorage.setItem("password", password);
         localStorage.setItem("pfpLink", pfpLink);
         alert("Account created successfully!");
+        showGlobalChat();
     } else {
         alert("Please fill in all fields.");
     }
@@ -94,14 +95,17 @@ function signInLastSavedAccount() {
         morePfp.src = savedPfpLink;
         morePfp.id = localStorage.getItem("pfpId");
         alert("Signed in as: " + savedUsername);
+        showGlobalChat();
     } else {
         alert("No saved username or password found.");
+        
     }
 }
 
 function showGlobalChat() {
-    const allMessagesDiv = document.createElement("ul");
+    const allMessagesDiv = document.createElement("div");
     allMessagesDiv.className = "all-messages";
+    allMessagesDiv.id = "messages";
     
     const savedAccountDiv = document.createElement("div");
     savedAccountDiv.className = "account-info";
@@ -137,10 +141,10 @@ function showGlobalChat() {
     uiDiv.className = "chat-ui";
     globalChatDiv.appendChild(uiDiv);
 
-    
+    const main = document.querySelector("main");
 
-    document.body.appendChild(savedAccountDiv);
-    document.body.appendChild(globalChatDiv);
+    main.appendChild(savedAccountDiv);
+    main.appendChild(globalChatDiv);
     signInForm.style.animation = "fadeOut 0.7s forwards";
     setTimeout(() => {
         signInForm.style.display = "none";
@@ -149,9 +153,32 @@ function showGlobalChat() {
     }, 700);
 
     socket.on("chat message", (msg) => {
-  const li = document.createElement("li");
-  li.textContent = msg;
-  document.getElementById("messages").appendChild(li);
+        const msgDiv = document.createElement("div");
+        
+        const savedUsername = localStorage.getItem("username");
+            const msgUsername = document.createElement("h2");
+        msgUsername.textContent = savedUsername;
+        msgUsername.className = "message-username";
+        
+        const savedPfpLink = localStorage.getItem("pfpLink");
+            const msgPfp = document.createElement("img");
+        msgPfp.src = savedPfpLink;
+        msgPfp.className = "message-pfp";
+        msgDiv.appendChild(msgPfp);
+            const msgText = document.createElement("p");
+            msgText.textContent = msg;
+        msgText.className = "message-text";
+        const msgTextDiv = document.createElement("div");
+        msgTextDiv.className = "message-text-div";
+        msgTextDiv.appendChild(msgUsername);
+        msgTextDiv.appendChild(msgText);
+        msgDiv.appendChild(msgTextDiv);
+        
+       
+        
+        msgDiv.className = "message";
+
+        document.getElementById("messages").appendChild(msgDiv);
 });
 
 }
@@ -159,8 +186,15 @@ function showGlobalChat() {
 const socket = io("https://global-chat-backend-9oz2.onrender.com");
 
 function sendMessage(inputElement) {
-    const message = inputElement.value.trim();
-    
-        socket.emit("sendMessage", message);
-    
+  const message = inputElement.value.trim();
+  if (message) {
+    socket.emit("chat message", message); 
+    inputElement.value = "";
+  }
 }
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        sendMessage(document.getElementById("messageInput"));
+    }
+});

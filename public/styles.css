@@ -355,7 +355,6 @@ i making the solver text_color soo long cuz the text color is gonna be a gradien
     flex-direction: row;
     gap: 10px;
 
-    margin-top: 600px;
 }
 
 .account-info{
@@ -390,8 +389,8 @@ i making the solver text_color soo long cuz the text color is gonna be a gradien
 
 .all-messages{
     display: flex;
-    justify-content: flex-end;
-    align-items: flex-end;
+    justify-content: flex-start;
+    align-items: flex-start;
     flex-direction: column;
     gap: 10px;
 
@@ -400,4 +399,53 @@ i making the solver text_color soo long cuz the text color is gonna be a gradien
     
     overflow-y: auto;
 
+}
+
+.message{
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
+}
+
+.message-text-div{
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.message-pfp{
+    width: 75px;
+    height: 75px;
+}
+
+footer{
+
+    margin-top: 5%;
+
+    height: auto;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+
+    background: black;
+
+    border: 1px solid white;
+
+    gap: 50px;
+
+    padding-bottom: 2%;
+
+    text-align: center;
+
+}
+
+.footer-logo{
+
+    margin-top: 2%;
 }
