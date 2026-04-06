@@ -547,3 +547,15 @@ footer{
         width: auto;
     }
 }
+
+.time-stamp-text{
+    opacity: 0.5;
+}
+
+.username-time-stamp-div{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: baseline;
+    gap: 10px;
+}
