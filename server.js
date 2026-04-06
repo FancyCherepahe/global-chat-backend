@@ -47,7 +47,7 @@ app.post("/api/register", async (req, res) => {
   users.push(newUser);
   saveUsers(users);
 
-  res.json({ success: true, message: "User registered successfully" });
+  res.json({ success: true, user: {username, pfpLink} ,message: "User registered successfully" });
 });
 
 // Login endpoint
