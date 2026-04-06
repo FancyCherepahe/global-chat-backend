@@ -159,7 +159,7 @@ function showGlobalChat() {
     const rulesTitle = document.createElement("h1");
     rulesTitle.textContent = "Rules And Info ";
     rulesTitle.className = "rules-title";
-    rulesTitle.addEventListener("click", () => {
+    rulesAndSystemInfoDiv.addEventListener("click", () => {
         ruleAndInfoList.style.display = ruleAndInfoList.style.display === "none" ? "block" : "none";
     });
     const ruleAndInfoList = document.createElement("ul");

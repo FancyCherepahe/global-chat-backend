@@ -193,7 +193,7 @@ transition: all 0.3s ease-in-out, filter 0.3s ease-in-out;
     font-size: 2rem;
     height: fit-content;
     font-weight: lighter;
-    width: 300px;
+    width: 90%;
     padding: 2%;
 }
 
@@ -201,7 +201,7 @@ transition: all 0.3s ease-in-out, filter 0.3s ease-in-out;
     font-size: 2rem;
     height: fit-content;
     font-weight: lighter;
-    width: auto;
+    width: 90%;
     padding: 2%;
 }
     
@@ -320,13 +320,16 @@ there is
 
 .global-chat{
     /* Rectangle 29 */
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
 
 
     background: linear-gradient(180deg, #080741 0%, #01030D 100%);
     border: 11px solid #000000;
     border-radius: 38px;
 
-    width: fit-content;
+    width: 370px;
     height: 670px;
 
     padding: 1%;
@@ -352,6 +355,11 @@ there is
     justify-content: center;
     align-items: center;
 
+    transition: all 0.3s ease-in-out, filter 0.3s ease-in-out;
+}
+
+.send-message-button:hover{
+    filter: hue-rotate(60deg) brightness(1.5);
 }
 
 .send-icon{
@@ -391,13 +399,6 @@ there is
     
 }
 
-.global-chat{
-    
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-}
-
 .all-messages{
     display: flex;
     justify-content: flex-start;
@@ -426,6 +427,11 @@ there is
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
+}
+
+.message-text{
+    width: auto;
+    overflow-wrap: anywhere;
 }
 
 .message-pfp{
@@ -488,6 +494,7 @@ footer{
     padding: 1% 3% 1% 3%;
     margin-left: auto;
     margin-right: auto;
+    margin-bottom: 20px;
 
     background: linear-gradient(180deg, #401A78 0%, #0B042C 99.52%);
     border: 9px solid #000000;
@@ -498,4 +505,45 @@ footer{
 
 .rules-system-info-div:hover, .info-input:hover{
     filter: hue-rotate(60deg) brightness(1.5);
+}
+@media (max-width: 1024px) {
+    header{
+        height: 50px;
+    }
+
+    .logo{
+        width: 30px;
+        height: 30px;
+
+        margin-left: 30%;
+    }
+
+    .nav-link{
+        font-size: 10px;
+    }
+
+}
+
+@media (max-width: 420px) {
+    .global-chat{
+        width: auto;
+    }
+    .sign-in-form{
+        width: auto;
+    }
+}
+
+@media (max-width: 380px) {
+   .info-input{
+        width: -webkit-fill-available;
+    }
+    .info-input-div{
+        width: -webkit-fill-available;
+    }
+}   
+
+@media (max-width: 333px) {
+    .account-info{
+        width: auto;
+    }
 }
