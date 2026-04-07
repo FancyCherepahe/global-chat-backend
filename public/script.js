@@ -209,6 +209,7 @@ function showGlobalChat() {
     messageInput.placeholder = "Type here";
     messageInput.className = "info-input";
     messageInput.id = "messageInput";
+    messageInput.maxCharacter = 500;
     
     const sendButton = document.createElement("button");
     const sendIcon = document.createElement("img");
