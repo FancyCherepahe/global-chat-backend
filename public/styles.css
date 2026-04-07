@@ -213,7 +213,7 @@ transition: all 0.3s ease-in-out, filter 0.3s ease-in-out;
     gap: 50px;
     flex-wrap: wrap;
 
-    width: 700px;
+    width: auto;
     height: 100%;
 
     background: linear-gradient(180deg, #401A78 0%, #0B042C 99.52%);
