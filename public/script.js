@@ -118,6 +118,7 @@ async function signInLastSavedAccount() {
     if (result.success){
         localStorage.setItem("username", result.user.username);
         localStorage.setItem("pfplink", result.user.pfplink)
+        localStorage.setItem("role", result.user.role)
         morePfp.src = result.user.pfplink;
         alert("Signed in as:" + username);
         showGlobalChat();
@@ -174,11 +175,18 @@ function showGlobalChat() {
     const savedUsername = document.createElement("h1");
     savedUsername.textContent = localStorage.getItem("username");
     savedUsername.className = "account-username";
-    savedAccountDiv.appendChild(savedUsername);
+    const savedRole = document.createElement("p");
+    savedRole.textContent = "Role: " + localStorage.getItem("role");
+    const savedAccountTextDiv = document.createElement("div");
+    savedAccountTextDiv.className = "saved-account-text-div"
+    savedAccountTextDiv.appendChild(savedUsername);
+    savedAccountTextDiv.appendChild(savedRole);
+    savedAccountDiv.appendChild(savedAccountTextDiv);
     const savedPfp = document.createElement("img");    
     savedPfp.className = "account-pfp";
     savedPfp.src = localStorage.getItem("pfplink");
     savedAccountDiv.appendChild(savedPfp);
+    
     const globalChatDiv = document.createElement("div");
     globalChatDiv.className = "global-chat";
     globalChatDiv.appendChild(allMessagesDiv);
