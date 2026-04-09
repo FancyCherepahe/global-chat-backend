@@ -93,7 +93,7 @@ async function saveUserData() {
             alert("Account Created Successfully!");
             showGlobalChat();
         } else {
-            alert("Error:" + result.message);
+            alert("Error: " + result.message);
         }
     } else {
         alert("Please fill in all fields.");
@@ -105,6 +105,10 @@ async function signInLastSavedAccount() {
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
     
+    if (!username || !password) {
+        alert("Please fill in all fields.");
+        return;
+    }
 
     const data = {username, password}
 
@@ -120,10 +124,11 @@ async function signInLastSavedAccount() {
         localStorage.setItem("pfplink", result.user.pfplink)
         localStorage.setItem("role", result.user.role)
         morePfp.src = result.user.pfplink;
-        alert("Signed in as:" + username);
+        alert("Signed in as: " + username);
+        socket.emit("register username", localStorage.getItem("username"))
         showGlobalChat();
     } else {
-        alert("Login failed:" +result.message);
+        alert("Login failed: " +result.message);
     }
 }
 
@@ -138,8 +143,22 @@ function renderMessage(data) {
 
   const msgUsername = document.createElement("h2");
   msgUsername.textContent = data.username;
-  msgUsername.className = "message-username";
+  msgUsername.className = "message-username " + (data.role);
 
+  const roleBadgeImg = document.createElement("img")
+  roleBadgeImg.src = "/images/icons/" + data.role + ".svg"
+  roleBadgeImg.className = "role-badge-img"
+  
+  const roleBadge = document.createElement("p");
+  const roleData = data.role;
+  roleBadge.textContent = roleData.toUpperCase();
+  roleBadge.className = "role-badge " + data.role;
+  
+  const roleBadgeDiv = document.createElement("div");
+  roleBadgeDiv.className = "role-badge-div " + (data.role);
+  roleBadgeDiv.appendChild(roleBadgeImg);
+  roleBadgeDiv.appendChild(roleBadge);
+  
   const timeStamp = document.createElement("p");
   const dateObj = new Date(data.timeStamp);
   const options = {hours: "2-digit", minutes: "2-digit"}
@@ -149,6 +168,7 @@ function renderMessage(data) {
   const usernameAndTimeStampDiv = document.createElement("div");
   usernameAndTimeStampDiv.className = "username-time-stamp-div";
   usernameAndTimeStampDiv.appendChild(msgUsername);
+  usernameAndTimeStampDiv.appendChild(roleBadgeDiv);
   usernameAndTimeStampDiv.appendChild(timeStamp);
 
   const msgText = document.createElement("p");
@@ -162,10 +182,12 @@ function renderMessage(data) {
 
   msgDiv.appendChild(msgTextDiv);
   document.getElementById("messages").appendChild(msgDiv);
+
+  console.log(data.role)
 }
 
 
-function showGlobalChat() {
+function showGlobalChat(data) {
     const allMessagesDiv = document.createElement("div");
     allMessagesDiv.className = "all-messages";
     allMessagesDiv.id = "messages";
@@ -177,6 +199,7 @@ function showGlobalChat() {
     savedUsername.className = "account-username";
     const savedRole = document.createElement("p");
     savedRole.textContent = "Role: " + localStorage.getItem("role");
+    savedRole.id = "role-text";
     const savedAccountTextDiv = document.createElement("div");
     savedAccountTextDiv.className = "saved-account-text-div"
     savedAccountTextDiv.appendChild(savedUsername);
@@ -247,6 +270,8 @@ function showGlobalChat() {
 
     
     socket.on("chat message", (data) => {
+        console.log("Incoming from server:", data);
+
         renderMessage(data);
     });
     
@@ -254,12 +279,43 @@ function showGlobalChat() {
     history.forEach((data) => {
         renderMessage(data);
     });
+    
     socket.on("system message", (data) => {
-  const msgDiv = document.createElement("div");
-  msgDiv.className = "system-message";
-  msgDiv.textContent = data.text;
-  document.getElementById("messages").appendChild(msgDiv);
-});
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "system-message";
+        msgDiv.textContent = data.text;
+        document.getElementById("messages").appendChild(msgDiv);
+    });
+
+    socket.on("clear chat", () =>{ 
+        const messageDiv = document.getElementById("messages")
+        if (messageDiv) {
+            messageDiv.innerHTML = "";
+        }
+    });
+    
+    socket.on("kicked user", () =>{
+        alert("You have been kicked!")
+    })
+
+    socket.on("muted", () =>{
+        const sendButton = document.querySelector(".send-message-button");
+        const input = document.getElementById("messageInput");
+        sendButton.style.display = "none";
+        input.style.display = "none";
+    })
+
+    socket.on("unmuted", () =>{
+        const sendButton = document.querySelector(".send-message-button");
+        const input = document.getElementById("messageInput");
+        sendButton.style.display = "flex";
+        input.style.display = "flex";
+    })
+
+    socket.on("changed role", (data) =>{
+        const roleText = document.getElementById("role-text")
+        roleText.textContent = "Role: " + data.value;
+    })
 });
 socket.emit("request history");
 };
@@ -269,16 +325,40 @@ socket.emit("request history");
 
 function sendMessage(inputElement) {
   const message = inputElement.value.trim();
-  if (message) {
-    socket.emit("chat message", {
-        username: localStorage.getItem("username"),
-        pfplink: localStorage.getItem("pfplink"),
-        message,
-        timeStamp: new Date().toISOString()
-    }); 
+  if (!message) return;
+
+    if (message.startsWith("/")) {
+        const parts = message.split(" ");
+        const command = parts[0].substring(1);
+        let target = null;
+        let value = null;
+
+        if (command === "setrole") {
+            target = parts.slice(1, -1).join(" ").trim();
+            value = parts[parts.length - 1];
+        } else {
+            target = parts.slice(1).join(" ").trim() || null;
+        }
+        
+        socket.emit("command", {
+            username: localStorage.getItem("username"),
+            command,
+            target,
+            value
+        });
+    } else {
+        socket.emit("chat message", {
+            username: localStorage.getItem("username"),
+            pfplink: localStorage.getItem("pfplink"),
+            role: localStorage.getItem("role"),
+            message,
+            timeStamp: new Date().toISOString()
+        })
+    };
     inputElement.value = "";
-  }
 }
+    
+
 
 document.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

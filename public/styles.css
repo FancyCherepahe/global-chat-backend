@@ -474,7 +474,7 @@ footer{
     flex-direction: row;
     gap: 10px;
 
-    width: 100%;
+    width: stretch;
     padding: 5px;
 
     background-color: rgba(255, 0, 0, 0.2);
@@ -565,4 +565,60 @@ footer{
     flex-direction: column;
     justify-content: center;
     align-items: start;
+}
+
+.message-username.owner{
+    background: linear-gradient(90deg, rgb(179, 255, 0) 0%, rgb(255, 77, 0) 100%);  
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+
+}
+
+.role-badge-div{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid black;
+    padding: 1px 3px 1px 3px;
+    border-radius: 15px;
+}
+.role-badge-div.owner{
+    background-color: rgb(168, 143, 0);
+    color: crimson;
+}
+
+.role-badge-div.user{
+    background-color: rgba(128, 128, 128, 0.374);
+    color: black;
+}
+
+.role-badge-div.moderator{
+    background-color: rgb(123, 0, 0);
+}
+
+.role-badge-div.creator{
+    background-color: rgb(0, 0, 183);
+}
+
+.role-badge-img{
+    width: 20px;
+}
+
+.role-badge.owner{
+
+    color: crimson;
+}
+
+.role-badge.user{
+
+    color: black;
+}
+
+.role-badge.moderator{
+    color: rgb(54, 0, 0);
+}
+
+.role-badge.creator{
+    color: rgb(0, 0, 88)
 }
