@@ -182,6 +182,7 @@ function renderMessage(data) {
 
   msgDiv.appendChild(msgTextDiv);
   document.getElementById("messages").appendChild(msgDiv);
+  document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
 
   console.log(data.role)
 }
@@ -191,6 +192,7 @@ function showGlobalChat(data) {
     const allMessagesDiv = document.createElement("div");
     allMessagesDiv.className = "all-messages";
     allMessagesDiv.id = "messages";
+    allMessagesDiv.scrollTop = allMessagesDiv.scrollHeight;
     
     const savedAccountDiv = document.createElement("div");
     savedAccountDiv.className = "account-info";
@@ -284,6 +286,7 @@ function showGlobalChat(data) {
         const msgDiv = document.createElement("div");
         msgDiv.className = "system-message";
         msgDiv.textContent = data.text;
+        msgDiv.scrollTop = msgDiv.scrollHeight;
         document.getElementById("messages").appendChild(msgDiv);
     });
 
