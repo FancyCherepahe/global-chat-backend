@@ -88,7 +88,7 @@ async function saveUserData() {
 
         const result = await response.json();
         if (result.success){
-            localStorage.setItem("username", result.user.username);
+            localStorage.setItem("username", result.user.usernameC);
             localStorage.setItem("pfplink", result.user.pfplink)
             alert("Account Created Successfully!");
             showGlobalChat();
@@ -121,11 +121,12 @@ async function signInLastSavedAccount() {
     const result = await response.json();
     if (result.success){
         localStorage.setItem("username", result.user.username);
-        localStorage.setItem("pfplink", result.user.pfplink)
-        localStorage.setItem("role", result.user.role)
+        localStorage.setItem("pfplink", result.user.pfplink);
+        localStorage.setItem("role", result.user.role);
+        localStorage.setItem("muteStatus", result.user.mutestatus);
         morePfp.src = result.user.pfplink;
         alert("Signed in as: " + username);
-        socket.emit("register username", localStorage.getItem("username"))
+        socket.emit("register username", localStorage.getItem("username"));
         showGlobalChat();
     } else {
         alert("Login failed: " +result.message);
@@ -242,7 +243,7 @@ function showGlobalChat(data) {
     messageInput.placeholder = "Type here";
     messageInput.className = "info-input";
     messageInput.id = "messageInput";
-    messageInput.maxlength= 500;
+    messageInput.maxlength = 500;
     
     const sendButton = document.createElement("button");
     const sendIcon = document.createElement("img");
@@ -257,6 +258,10 @@ function showGlobalChat(data) {
     uiDiv.appendChild(sendButton);
     uiDiv.className = "chat-ui";
     globalChatDiv.appendChild(uiDiv);
+
+    if (localStorage.getItem("status") === "muted" || localStorage.getItem("muteStatus") === "muted") {
+        uiDiv.innerHTML = "";
+    }
 
     
 
@@ -281,11 +286,14 @@ function showGlobalChat(data) {
     history.forEach((data) => {
         renderMessage(data);
     });
+    });
     
     socket.on("system message", (data) => {
         const msgDiv = document.createElement("div");
         msgDiv.className = "system-message";
-        msgDiv.textContent = data.text;
+        const systemMsg = document.createElement("p");
+        systemMsg.textContent = data.text;
+        msgDiv.appendChild(systemMsg);
         msgDiv.scrollTop = msgDiv.scrollHeight;
         document.getElementById("messages").appendChild(msgDiv);
     });
@@ -301,29 +309,54 @@ function showGlobalChat(data) {
         alert("You have been kicked!")
     })
 
-    socket.on("muted", () =>{
+    socket.on("muted", (data) =>{
+        if (data?.muteRole) {
+            localStorage.setItem("muteRole", data.muteRole);
+        }
         const sendButton = document.querySelector(".send-message-button");
         const input = document.getElementById("messageInput");
-        sendButton.style.display = "none";
-        input.style.display = "none";
+        const uiDiv = document.querySelector(".chat-ui")
+        uiDiv.innerHTML = "";
+        localStorage.setItem("status", "muted");
     })
 
     socket.on("unmuted", () =>{
-        const sendButton = document.querySelector(".send-message-button");
-        const input = document.getElementById("messageInput");
-        sendButton.style.display = "flex";
-        input.style.display = "flex";
+        localStorage.removeItem("muteRole");
+        const messageInput = document.createElement("input");
+    messageInput.type = "text";
+    messageInput.placeholder = "Type here";
+    messageInput.className = "info-input";
+    messageInput.id = "messageInput";
+    messageInput.maxlength = 500;
+    
+    const sendButton = document.createElement("button");
+    const sendIcon = document.createElement("img");
+    sendIcon.src = "images/Vector.png";
+    sendIcon.className = "send-icon";
+    sendButton.appendChild(sendIcon);
+    sendButton.className = "send-message-button";
+    sendButton.addEventListener("click",  () => sendMessage(messageInput));
+        
+        const uiDiv = document.querySelector(".chat-ui")
+        uiDiv.appendChild(messageInput);
+        uiDiv.appendChild(sendButton);
+        localStorage.removeItem("status");
     })
 
     socket.on("changed role", (data) =>{
         const roleText = document.getElementById("role-text")
         roleText.textContent = "Role: " + data.value;
     })
-});
-socket.emit("request history");
-};
 
-
+    socket.on("update pfp", (data) =>{
+        const accountPfp = document.querySelector(".account-pfp");
+        if (accountPfp) {
+            accountPfp.src = data.value;
+            localStorage.setItem("pfplink", data.value);
+        }
+    })
+    socket.emit("request history"); 
+}
 
 
 function sendMessage(inputElement) {
@@ -336,10 +369,18 @@ function sendMessage(inputElement) {
         let target = null;
         let value = null;
 
-        if (command === "setrole") {
+        if (command === "tell") {
+            target = parts[1]; // first word after /tell
+            value = parts.slice(2).join(" ").trim(); // rest of the message
+        }
+        else if (command === "setrole") {
             target = parts.slice(1, -1).join(" ").trim();
             value = parts[parts.length - 1];
-        } else {
+        } 
+        else if (command === "setpfp") {
+            value = parts[1];
+        }
+        else {
             target = parts.slice(1).join(" ").trim() || null;
         }
         

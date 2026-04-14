@@ -144,56 +144,17 @@ io.on('connection', (socket) => {
    // }
 
     // --- universal commands ---
-    if (data.command === "setpfp") {
-      if (data.value) {
-        const setPfpPictures = [
-          {id: 1, url: "/images/stock-pfp/uzi-pfp.png"},
-          {id: 2, url: "/images/stock-pfp/n-pfp.png"},
-          {id: 3, url: "/images/stock-pfp/v-pfp.png"},
-          {id: 4, url: "/images/stock-pfp/cyn-pfp.png"},
-          {id: 5, url: "/images/stock-pfp/lizzie-pfp.png"},
-          {id: 6, url: "/images/stock-pfp/doll-pfp.png"},
-          {id: 7, url: "/images/stock-pfp/absolute-solver-pfp.png"}
-        ]
-        const selectedPfp = setPfpPictures.find(p => p.id === parseInt(data.value));
-        if (selectedPfp) {
-          await pool.query("UPDATE users SET pfplink=$1 WHERE username=$2", [selectedPfp.url, data.username]);
-          socket.emit("system message", { text: `Your profile picture was updated` });
-          socket.emit("update pfp", { value: selectedPfp.url });
-        } else {
-          socket.emit("system message", { text: "Invalid profile picture id, check /help for correct ones"})
-        }
-    } else {
-      socket.emit("system message", { text: "Invalid use of setpfp command, check /help for correct use" });
-    }
-      return;
-    }
-    if (data.command === "help") {
-      let userCommands = ["tell [username] [message]", " setpfp [id] (1 - uzi, 2 - n, 3 - v, 4 - cyn, 5 - lizzie, 6 - doll, 7 - absolute solver)"];
-      let moderatorCommands = ["clear", " kick [username]", " ban [username]", " unban [username]", " mute [username]", " unmute [username]"];
-      let ownerCommands = ["setrole [username] [role]"];
-      let commands = [];
-      if (role === "user") commands.push(userCommands);
-      if (role === "moderator") commands.push(userCommands, moderatorCommands);
-      if (role === "owner") commands.push(userCommands, moderatorCommands, ownerCommands);
-      socket.emit("system message", { text: `Available commands: ${commands.join(", ")}` });
-      return;
-          
-    }
-   
     if (data.command === "tell" && data.target && data.value) {
-      
-      let found = false;
-      for (let [, s] of io.sockets.sockets) {
-        console.log("Comparing target:", data.target, "with socket:", s.username);
-        if (s.username === data.target) {
+    
+    
+  let found = false;
+  for (let [, s] of io.sockets.sockets) {
+    if (s.username === data.target) {
       s.emit("system message", { text: `${data.username} whispers to you: ${data.value}` });
       found = true;
       break;
     }
-    
   }
-  
   if (!found) {
     socket.emit("system message", { text: "User not found." });
   }
@@ -235,6 +196,12 @@ io.on('connection', (socket) => {
 
         case "unmute":
           // unmute logic here
+          break;
+
+        case "help":
+          let commands = ["clear", "kick [username]", "ban [username]", "unban [username]", "mute [username]", "unmute [username]"];
+          if (role === "owner") commands.push("setrole [username] [role]");
+          socket.emit("system message", { text: `Available commands: ${commands.join(", ")}` });
           break;
 
         case "setrole":
