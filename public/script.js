@@ -262,14 +262,17 @@ function renderMessage(data) {
             replyString = [data.username, data.message];
            // msgDiv.classList.add("replied");
            // msgDiv.classList.remove("unreplied");
-            alert("Replying to " + data.username + ": " + data.message + replyStatus);
+            const msgInput = document.getElementById("messageInput");
+            msgInput.placeholder = `Replying to ${data.username}...`;
+            showExtra();
     
         } else {
             replyString = [];
            //msgDiv.classList.add("unreplied");
            //msgDiv.classList.remove("replied");
            hideExtra(); 
-           alert("Stopped replying to " + data.username + ": " + data.message + replyStatus);
+          const msgInput = document.getElementById("messageInput");
+            msgInput.placeholder = `Text here`;
     
         }
     });
@@ -279,6 +282,12 @@ function renderMessage(data) {
     const extraInteractDiv = document.createElement("div");
     extraInteractDiv.className = "extra-interact-div";
     extraInteractDiv.appendChild(replyDiv);
+
+    socket.on("chat message", (data) => {
+        if (data.username === localStorage.getItem("username")) {
+            hideExtra();
+        }
+    })
 
     if (data.replyTo) {
         repliedStatus = true;
