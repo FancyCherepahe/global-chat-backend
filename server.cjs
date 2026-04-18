@@ -53,6 +53,8 @@ app.post("/api/register", async (req, res) => {
   
   const { username, password, pfplink } = req.body;
 
+  const clientIP = req.headers['x-forwarded-for'] || req.ip;
+
   try {
     const passwordhash = await bcrypt.hash(password, 10);
     await pool.query(
@@ -60,7 +62,7 @@ app.post("/api/register", async (req, res) => {
       [username, passwordhash, pfplink, "user"]
     );
     const banCheck = await pool.query("SELECT * FROM bans WHERE username=$1 OR ip=$2 OR token=$3",
-      [username, req.ip, req.body.token])
+      [username, clientIP, req.body.token])
     if (banCheck.rows.length > 0) {
       return res.json({ success: false, message: "You are banned from this chat"})
     }
@@ -77,9 +79,11 @@ app.post("/api/login", async (req, res) => {
 
   const user = result.rows[0] 
 
+  const clientIP = req.headers['x-forwarded-for'] || req.ip;
+
   if (user && await bcrypt.compare(password, user.passwordhash)) {
     const banCheck = await pool.query("SELECT * FROM bans WHERE username=$1 OR ip=$2 OR token=$3",
-      [username, req.ip, req.body.token])
+      [username, clientIP, req.body.token])
     if (banCheck.rows.length > 0 || user.role === "banned") {
       return res.json({ success: false, message: "You are banned from this chat"})
     }
@@ -185,7 +189,7 @@ io.on('connection', (socket) => {
       
       let found = false;
       for (let [, s] of io.sockets.sockets) {
-        console.log("Comparing target:", data.target, "with socket:", s.username);
+       
         if (s.username === data.target) {
       s.emit("system message", { text: `${data.username} whispers to you: ${data.value}` });
       found = true;
@@ -222,19 +226,77 @@ io.on('connection', (socket) => {
           break;
 
         case "ban":
-          // ban logic here (same as before)
-          break;
+           const result = await pool.query("SELECT role FROM users WHERE username=$1", [data.target]);
+          if (result.rows.length === 0) return;
+          const targetRole = result.rows[0].role;
+            
+          if (targetRole === "owner" || targetRole === "moderator"){
+            socket.emit("system message", { text: "Owner or moderator cannot be banned"});
+            return;
+          } else {
+            await pool.query("UPDATE users Set role='banned' WHERE username=$1", [data.target]);
+            
+            await pool.query("INSERT INTO bans (username, ip, token) VALUES ($1, $2, $3)", 
+              [data.target, socket.handshake.headers['x-forwarded-for'] || socket.handshake.address, socket.handshake.auth.token]);
+            }
+            for (let [id, s] of io.sockets.sockets) {
+              if (s.username === data.target){
+                bannedTokens.add(s.handshake.auth.token);  
+                bannedIPs.add(s.handshake.headers['x-forwarded-for'] || s.handshake.address);
 
+
+                s.emit("system message", { text: "You have been banned"});
+                s.disconnect(true);
+                io.emit("system message", {text: `${data.target} was banned by ${data.username} `});
+                break;
+              }
+            }
+          break;
+          
         case "unban":
           // unban logic here
+          await pool.query("UPDATE users Set role='user' WHERE username=$1", [data.target]);
+        
+        banTruth = await pool.query("SELECT ip, token FROM bans WHERE username=$1", [data.target]);
+        
+        await pool.query("DELETE FROM bans WHERE username=$1", [data.target]);
+        
+        if (banTruth.rows.length > 0) {
+          const { ip, token} = banTruth.rows[0];
+          if (ip) bannedIPs.delete(ip);
+          if (token) bannedTokens.delete(token);
+        }
+        for (let [id, s] of io.sockets.sockets){
+          if (s.username === data.target){
+            s.emit("unbanned");
+            break;
+          }
+        }
+        io.emit("system message", {text: `${data.target} was unbanned by ${data.username}`});
           break;
 
         case "mute":
-          // mute logic here
+          if (data.target) {
+            await pool.query("UPDATE users SET mutestatus='muted' WHERE username=$1", [data.target]);
+            io.emit("system message", { text: `${data.target} was muted by ${data.username}`});
+            for (let [id, s] of io.sockets.sockets) {
+              if (s.username === data.target) {
+                s.emit("muted", {target: data.target});
+              }
+            }
+          }
           break;
 
         case "unmute":
-          // unmute logic here
+          if (data.target) {
+            await pool.query("UPDATE users SET mutestatus='unmuted' WHERE username=$1", [data.target]);
+            io.emit("system message", { text: `${data.target} was unmuted by ${data.username}`});
+            for (let [id, s] of io.sockets.sockets) {
+              if (s.username === data.target) {
+                s.emit("unmuted");
+              }
+            }
+          }
           break;
 
         case "setrole":
@@ -265,8 +327,7 @@ io.on('connection', (socket) => {
 
 
   socket.on('chat message', async (data) => {
-    
-    
+     
     const result = await pool.query(
       "SELECT username, pfplink, role, muteStatus FROM users Where username=$1",
       [data.username]
@@ -282,12 +343,17 @@ io.on('connection', (socket) => {
         message: data.message,
         timeStamp: Date.now()
       }
+
+      if (data.replyTo) {
+        enrichedMessage.replyTo = data.replyTo;
+      }
+
       io.emit('chat message', enrichedMessage);
       
       chatHistory.push(enrichedMessage);
       if (chatHistory.length > 1000) chatHistory.shift()
         
-  
+      
     }
 
     

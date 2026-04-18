@@ -413,14 +413,6 @@ there is
 
 }
 
-.message{
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    flex-direction: row;
-    gap: 10px;
-}
-
 .message-text-div{
     display: flex;
     justify-content: flex-start;
@@ -546,6 +538,9 @@ footer{
     .account-info{
         width: auto;
     }
+    .time-stamp-text{
+        display: none
+    }
 }
 
 .time-stamp-text{
@@ -622,3 +617,83 @@ footer{
 .role-badge.creator{
     color: rgb(0, 0, 88)
 }
+
+.reply-img{
+    width: 30px;
+    height: 30px;
+}
+
+.normal-message{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
+}
+
+.extra-interact-div{
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.message{
+    background: transparent;
+    border: none;
+    width: stretch;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px;
+}
+
+.reply-div{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 5px;
+}
+
+.message.replied{
+    background-color: rgba(255,255,255,0.3);
+    border: 2px solid black;
+    border-radius: 30px;
+    padding: 0px;
+}
+
+.message.unreplied{
+    background-color: transparent;
+    border: none;
+    padding: 2px;
+}
+
+.message.your-original-reply{
+    background: rgba(0, 255, 0, 0.2);
+    border-radius: 15px;
+}
+
+.original-reply-message-div{
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
+    
+    padding: 5px;
+    border-radius: 15px;
+    width: stretch;
+}
+
+.original-reply-img{
+    width: 20px;
+    height: 20px;
+    transform: scaleX(-1);
+}
+
