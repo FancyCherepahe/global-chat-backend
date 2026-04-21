@@ -289,7 +289,6 @@ function renderMessage(data) {
     deleteDiv = document.createElement("div");
     deleteDiv.className = "reply-div";
     deleteDiv.addEventListener("click", () => {
-        alert("delete message with id: " + data.messageId)
         socket.emit("delete message", {
             username: localStorage.getItem("username"),
             messageId: data.messageId,
@@ -417,10 +416,48 @@ function showGlobalChat(data) {
     sendButton.className = "send-message-button";
     sendButton.addEventListener("click",  () => sendMessage(messageInput));
 
+    const stickerButton = document.createElement("button");
+    const stickerIcon = document.createElement("img");
+    const stickerMenu = document.createElement("div");
+    stickerMenu.className = "sticker-menu";
+    const stickersDivText = document.createElement("p");
+    stickersDivText.textContent = "Express yourself with custom stickers!";
+    stickerMenu.appendChild(stickersDivText);
+    const stickersDivStickersPackDiv = document.createElement("div");
+    stickersDivStickersPackDiv.className = "sticers-pack-div";
+    const stickerPacks = [
+        {pack: "Sticker Pack 1"}, 
+        {pack: "Sticker Pack 2"}
+    ];
+    let currentPack = 1;
+    i = 1;
+    stickerPacks.forEach((pack) => {
+        const packs = document.createElement("button");
+        packs.textContent = pack.pack;
+        packs.id = i++;
+        packs.addEventListener("click", () => {
+            alert("test")
+            let currentPack = packs.id;
+            console.log(currentPack)
+        })
+        stickersDivStickersPackDiv.appendChild(packs);
+        console.log(currentPack)
+    });
+    stickerMenu.appendChild(stickersDivStickersPackDiv);
+    stickerIcon.src = "images/icons/sticker.svg";
+    stickerIcon.className = "send-icon";
+    stickerButton.className = "send-message-button";
+    stickerButton.addEventListener("click", () => {
+        
+    })
+    stickerButton.appendChild(stickerIcon);
+
     const uiDiv = document.createElement("div");
     uiDiv.appendChild(messageInput);
+    uiDiv.appendChild(stickerButton);
     uiDiv.appendChild(sendButton);
     uiDiv.className = "chat-ui";
+    globalChatDiv.appendChild(stickerMenu);
     globalChatDiv.appendChild(uiDiv);
 
     if (localStorage.getItem("status") === "muted" || localStorage.getItem("muteStatus") === "muted") {

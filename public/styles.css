@@ -697,3 +697,27 @@ footer{
     transform: scaleX(-1);
 }
 
+#messageInput{
+    width: 100%
+}
+
+.sticker-menu{ 
+    position: static;
+    background: linear-gradient(180deg, #401A78 0%, #0B042C 99.52%);
+    border: 2px solid black;
+    border-radius: 15px;
+    width: auto;
+    height: 150px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 30px;
+    padding: 10px;
+}
+
+.sticers-pack-div{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
+}
