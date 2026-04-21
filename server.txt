@@ -189,7 +189,7 @@ io.on('connection', (socket) => {
       
       let found = false;
       for (let [, s] of io.sockets.sockets) {
-        console.log("Comparing target:", data.target, "with socket:", s.username);
+       
         if (s.username === data.target) {
       s.emit("system message", { text: `${data.username} whispers to you: ${data.value}` });
       found = true;
@@ -335,38 +335,41 @@ io.on('connection', (socket) => {
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
-      if (replyTo.rows.length > 0) {
+      
       const enrichedMessage = {
         username: user.username,
         pfplink: user.pfplink,
         role: user.role,
         message: data.message,
-        replyTo: data.replyTo,
+        messageId: data.messageId,
         timeStamp: Date.now()
       }
+
+      if (data.replyTo) {
+        enrichedMessage.replyTo = data.replyTo;
+      }
+
       io.emit('chat message', enrichedMessage);
       
       chatHistory.push(enrichedMessage);
       if (chatHistory.length > 1000) chatHistory.shift()
         
-      }
-    } else {
-      const enrichedMessage = {
-        username: user.username,
-        pfplink: user.pfplink,
-        role: user.role,
-        message: data.message,
-        timeStamp: Date.now()
-      }
-      io.emit('chat message', enrichedMessage);
       
-      chatHistory.push(enrichedMessage);
-      if (chatHistory.length > 1000) chatHistory.shift()
-        
     }
 
     
   });
+
+  socket.on("delete message", async (data) => {
+    const msgId = data.messageId;
+    if (!msgId) return;
+    const result = await pool.query("SELECT role FROM users WHERE username=$1", [data.username]);
+    const role = result.rows[0]?.role;
+    if (role === "owner" || role === "moderator") {
+      chatHistory = chatHistory.filter(msg => msg.messageId !== msgId);
+      io.emit("delete message", { messageId: msgId});
+    }
+  })
 
   socket.on('disconnect', () => {
   

@@ -99,7 +99,8 @@ async function saveUserData() {
         const result = await response.json();
         if (result.success){
             localStorage.setItem("username", result.user.username);
-            localStorage.setItem("pfplink", result.user.pfplink)
+            localStorage.setItem("pfplink", result.user.pfplink);
+            localStorage.setItem("role", "user");
             alert("Account Created Successfully!");
             showGlobalChat();
         } else {
@@ -145,18 +146,35 @@ async function signInLastSavedAccount() {
 
 
 function renderMessage(data) {
+    let yourOriginalReply = false;
+    let repliedStatus = false;
+    
     function showExtra() {
         const extra = msgDiv.querySelector(".extra-interact-div");
         extra.style.display = "flex";
-        msgDiv.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
-        msgDiv.style.borderRadius = "30px";
-        msgDiv.style.border = "2px solid black";
-        msgDiv.style.padding = "0px";
+        if (yourOriginalReply) {
+            msgDiv.style.backgroundColor = "rgba(0, 255, 0, 0.2)"
+            msgDiv.style.border = "2px solid black";
+        } else if (repliedStatus) {
+            msgDiv.style.backgroundColor = "rgba(255, 255, 255, 0.18)"
+        } else {
+            msgDiv.style.backgroundColor = "rgba(255, 255, 255, 0.3)"
+        }
+        msgDiv.style.borderRadius = "15px";
+        msgDiv.style.padding = "2px";
+    
     }
     function hideExtra() {
         const extra = msgDiv.querySelector(".extra-interact-div");
         extra.style.display = "none";
-        msgDiv.style.backgroundColor = "transparent";
+        if (yourOriginalReply) {
+            msgDiv.style.backgroundColor = "rgba(0, 255, 0, 0.2)"
+        } else if (repliedStatus) {
+            msgDiv.style.backgroundColor = "rgba(255, 255, 255, 0.18)"
+        } else {
+            msgDiv.style.backgroundColor = "transparent"
+
+        }
         msgDiv.style.border = "none";
         msgDiv.style.padding = "2px";
     }
@@ -171,8 +189,13 @@ function renderMessage(data) {
     }
     const msgDiv = document.createElement("div");
     msgDiv.className = "message";
+    
     msgDiv.addEventListener("click", () => {
         extraChanges();
+        if (repliedStatus && !yourOriginalReply) {
+            msgDiv.style.background = "rgba(255,255,255,0.18)";
+            msgDiv.style.borderRadius = "15px";
+        }
     })
 
     const normalMessageDiv = document.createElement("div");
@@ -225,58 +248,102 @@ function renderMessage(data) {
     const replyImg = document.createElement("img");
     replyImg.src = "/images/icons/reply.svg";
     replyImg.className = "reply-img";
-    replyImg.addEventListener("click", (event) => {    
-        event.stopPropagation();
-        replyStatus = !replyStatus;
-        if (replyStatus) {
-            replyString = [data.username, data.message];
-            msgDiv.classList.add("replied");
-            msgDiv.classList.remove("unreplied");
-            alert("Replying to " + data.username + ": " + data.message + replyStatus);
-        } else {
-            replyString = [];
-            msgDiv.classList.add("unreplied");
-            msgDiv.classList.remove("replied");
-            hideExtra();
-            alert("Stopped replying to " + data.username + ": " + data.message + replyStatus);
-        }
-    });
-
     
-
     const replyText = document.createElement("p");
     replyText.textContent = "Reply";
     replyText.className = "reply-text";
     
     replyDiv = document.createElement("div");
     replyDiv.className = "reply-div";
+    replyDiv.addEventListener("click", (event) => {    
+        event.stopPropagation();
+        replyStatus = !replyStatus;
+        if (replyStatus) {
+            replyString = [data.username, data.message];
+           // msgDiv.classList.add("replied");
+           // msgDiv.classList.remove("unreplied");
+            const msgInput = document.getElementById("messageInput");
+            msgInput.placeholder = `Replying to ${data.username}...`;
+            showExtra();
+    
+        } else {
+            replyString = [];
+           //msgDiv.classList.add("unreplied");
+           //msgDiv.classList.remove("replied");
+           hideExtra(); 
+          const msgInput = document.getElementById("messageInput");
+            msgInput.placeholder = `Text here`;
+    
+        }
+    });
     replyDiv.appendChild(replyImg);
     replyDiv.appendChild(replyText);
+
+    deleteImg = document.createElement("img");
+    deleteImg.className = "reply-img";
+    deleteImg.src = "/images/icons/delete.svg";
+
+    deleteText = document.createElement("p");
+    deleteText.textContent = "Delete";
+
+    deleteDiv = document.createElement("div");
+    deleteDiv.className = "reply-div";
+    deleteDiv.addEventListener("click", (data) => {
+        alert("delete message with id: " + data.messageId)
+        socket.emit("delete message", {
+            username: localStorage.getItem("username"),
+            messageId: data.messageId,
+        })
+    });
+    deleteDiv.appendChild(deleteImg);
+    deleteDiv.appendChild(deleteText);
 
     const extraInteractDiv = document.createElement("div");
     extraInteractDiv.className = "extra-interact-div";
     extraInteractDiv.appendChild(replyDiv);
+    extraInteractDiv.appendChild(deleteDiv);
+
+    socket.on("chat message", (data) => {
+        if (data.username === localStorage.getItem("username")) {
+            hideExtra();
+        }
+    })
 
     if (data.replyTo) {
+        repliedStatus = true;
         const originalReplyMessageDiv = document.createElement("div");
         originalReplyMessageDiv.className = "original-reply-message-div";
+        const originalReplyImg = document.createElement("img");
+        originalReplyImg.src = "/images/icons/reply.svg";
+        originalReplyImg.className = "original-reply-img";
         const originalReplyUsername = document.createElement("p");
-        originalReplyUsername.textContent = data.replyTo.username;
+        originalReplyUsername.textContent = data.replyTo.username + ":";
         originalReplyUsername.className = "original-reply-username";
         const originalReplyText = document.createElement("p");
         originalReplyText.textContent = data.replyTo.message.slice(0, 20) + (data.replyTo.message.length > 20 ? "..." : "");
         originalReplyText.className = "original-reply-text";
+        originalReplyMessageDiv.appendChild(originalReplyImg);
         originalReplyMessageDiv.appendChild(originalReplyUsername);
         originalReplyMessageDiv.appendChild(originalReplyText);
         msgDiv.appendChild(originalReplyMessageDiv);
+        if (data.replyTo && data.replyTo.username === localStorage.getItem("username")){
+            yourOriginalReply = true;
+            msgDiv.style.background = "rgba(0, 255, 0, 0.2)";
+            msgDiv.style.borderRadius = "15px";
+        } else {
+            yourOriginalReply = false;
+            msgDiv.style.background = "rgba(255,255,255,0.18)";
+            msgDiv.style.borderRadius = "15px";
+        }
     }
+    
     normalMessageDiv.appendChild(msgTextDiv);
     msgDiv.appendChild(normalMessageDiv);
     msgDiv.appendChild(extraInteractDiv);
     document.getElementById("messages").appendChild(msgDiv);
     document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
     
-    console.log(data.role)
+
 }
 
 
@@ -368,7 +435,7 @@ function showGlobalChat(data) {
 
     
     socket.on("chat message", (data) => {
-        console.log("Incoming from server:", data);
+       
 
         renderMessage(data);
     });
@@ -445,6 +512,15 @@ function showGlobalChat(data) {
             localStorage.setItem("pfplink", data.value);
         }
     })
+
+    socket.on("delete message", (data) => {
+        const messages = document.querySelectorAll(".message");
+        messages.forEach((message) => {
+            if (message.dataset.id === data.messageId) {
+                message.remove();
+            }
+        })
+    })
     socket.emit("request history"); 
 }
 
@@ -486,6 +562,7 @@ function sendMessage(inputElement) {
             username: localStorage.getItem("username"),
             pfplink: localStorage.getItem("pfplink"),
             role: localStorage.getItem("role"),
+            messageId: crypto.randomUUID(),
             message,
             replyTo: {
                 username: replyString[0],
@@ -498,6 +575,7 @@ function sendMessage(inputElement) {
                 username: localStorage.getItem("username"),
                 pfplink: localStorage.getItem("pfplink"),
                 role: localStorage.getItem("role"),
+                messageId: crypto.randomUUID(),
                 message,
                 timeStamp: new Date().toISOString()
             })

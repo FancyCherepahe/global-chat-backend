@@ -341,6 +341,7 @@ io.on('connection', (socket) => {
         pfplink: user.pfplink,
         role: user.role,
         message: data.message,
+        messageId: data.messageId,
         timeStamp: Date.now()
       }
 
@@ -358,6 +359,19 @@ io.on('connection', (socket) => {
 
     
   });
+
+  socket.on("delete message", async (data) => {
+    const targetMsg = chatHistory.find(msg => msg.messageId === data.messageId);
+    if (!targetMsg) return;
+    const msgId = data.messageId;
+    if (!msgId) return;
+    const result = await pool.query("SELECT role FROM users WHERE username=$1", [data.username]);
+    const role = result.rows[0]?.role;
+    if (role === "owner" || role === "moderator" || targetMsg.username === data.username) {
+      chatHistory = chatHistory.filter(msg => msg.messageId !== msgId);
+      io.emit("delete message", { messageId: msgId});
+    }
+  })
 
   socket.on('disconnect', () => {
   

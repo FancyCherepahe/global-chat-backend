@@ -189,7 +189,7 @@ function renderMessage(data) {
     }
     const msgDiv = document.createElement("div");
     msgDiv.className = "message";
-    
+    msgDiv.dataset.id = data.messageId;
     msgDiv.addEventListener("click", () => {
         extraChanges();
         if (repliedStatus && !yourOriginalReply) {
@@ -279,9 +279,35 @@ function renderMessage(data) {
     replyDiv.appendChild(replyImg);
     replyDiv.appendChild(replyText);
 
+    deleteImg = document.createElement("img");
+    deleteImg.className = "reply-img";
+    deleteImg.src = "/images/icons/delete.svg";
+
+    deleteText = document.createElement("p");
+    deleteText.textContent = "Delete";
+
+    deleteDiv = document.createElement("div");
+    deleteDiv.className = "reply-div";
+    deleteDiv.addEventListener("click", () => {
+        alert("delete message with id: " + data.messageId)
+        socket.emit("delete message", {
+            username: localStorage.getItem("username"),
+            messageId: data.messageId,
+        })
+    });
+    deleteDiv.appendChild(deleteImg);
+    deleteDiv.appendChild(deleteText);
+
+    const currentUser = localStorage.getItem("username");
+    const currentRole = localStorage.getItem("role");
+    
+
     const extraInteractDiv = document.createElement("div");
     extraInteractDiv.className = "extra-interact-div";
     extraInteractDiv.appendChild(replyDiv);
+    if (currentRole === "moderator" || currentRole === "owner" || data.username === currentUser){
+        extraInteractDiv.appendChild(deleteDiv);
+    }
 
     socket.on("chat message", (data) => {
         if (data.username === localStorage.getItem("username")) {
@@ -492,6 +518,15 @@ function showGlobalChat(data) {
             localStorage.setItem("pfplink", data.value);
         }
     })
+
+    socket.on("delete message", (data) => {
+        const messages = document.querySelectorAll(".message");
+        messages.forEach((message) => {
+            if (message.dataset.id === data.messageId) {
+                message.remove();
+            }
+        })
+    })
     socket.emit("request history"); 
 }
 
@@ -533,6 +568,7 @@ function sendMessage(inputElement) {
             username: localStorage.getItem("username"),
             pfplink: localStorage.getItem("pfplink"),
             role: localStorage.getItem("role"),
+            messageId: crypto.randomUUID(),
             message,
             replyTo: {
                 username: replyString[0],
@@ -545,6 +581,7 @@ function sendMessage(inputElement) {
                 username: localStorage.getItem("username"),
                 pfplink: localStorage.getItem("pfplink"),
                 role: localStorage.getItem("role"),
+                messageId: crypto.randomUUID(),
                 message,
                 timeStamp: new Date().toISOString()
             })
