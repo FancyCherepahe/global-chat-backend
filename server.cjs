@@ -6,13 +6,31 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { timeStamp } = require('console');
-const { Pool } = require('pg')
+const { Pool } = require('pg');
+const { v4: uuidv4 } = require("uuid");
+
 
 const app = express();
 function clearChat() {
   chatHistory = [];
-  socket.emit("system message", { text: "Chat history cleared for the new day" });
+  io.emit("system message", { text: "Chat history cleared for the new day" });
 }
+
+const masterStickers = {
+  ":1_uzi_heart:": "images/stickers/sticker-pack-1-1.png",
+  ":1_uzi_sad:": "images/stickers/sticker-pack-1-2.png",
+  ":1_uzi_angry:": "images/stickers/sticker-pack-1-3.png",
+  ":2_uzi_happy:": "images/stickers/sticker-pack-2-1.png",
+  ":2_n_happy:": "images/stickers/sticker-pack-2-2.png",
+  ":2_v_angry:": "images/stickers/sticker-pack-2-3.png",
+  ":2_lizzy_on_phone_angry:": "images/stickers/sticker-pack-2-4.png",
+  ":2_j_silly:": "images/stickers/sticker-pack-2-5.png",
+  ":2_doll_serious:": "images/stickers/sticker-pack-2-6.png",
+  ":2_thad_chill:": "images/stickers/sticker-pack-2-7.png"
+}
+
+
+let url = process.env.DATABASE_URL;
 
 let chatHistory = []
 
@@ -21,7 +39,7 @@ let chatHistory = []
     ssl: { rejectUnauthorized: false }
   })
 
-app.use(express.json())
+  app.use(express.json())
 
 async function init() {  
 
@@ -33,6 +51,7 @@ async function init() {
     pfplink TEXT,
     role TEXT DEFAULT 'user',
     muteStatus TEXT DEFAULT 'unmuted',
+    token TEXT DEFAULT gen_random_uuid(),
     createdat TIMESTAMP DEFAULT NOW()
     )
   `);
@@ -56,17 +75,18 @@ app.post("/api/register", async (req, res) => {
   const clientIP = req.headers['x-forwarded-for'] || req.ip;
 
   try {
+    const firstToken = uuidv4();
     const passwordhash = await bcrypt.hash(password, 10);
     await pool.query(
-      'INSERT INTO users (username, passwordhash, pfplink, role, createdat) VALUES ($1, $2, $3, $4, NOW())',
-      [username, passwordhash, pfplink, "user"]
+      'INSERT INTO users (username, passwordhash, pfplink, role, token, createdat) VALUES ($1, $2, $3, $4, $5, NOW())',
+      [username, passwordhash, pfplink, "user", firstToken]
     );
     const banCheck = await pool.query("SELECT * FROM bans WHERE username=$1 OR ip=$2 OR token=$3",
       [username, clientIP, req.body.token])
     if (banCheck.rows.length > 0) {
       return res.json({ success: false, message: "You are banned from this chat"})
     }
-    res.json({ success: true, user: {username, pfplink, role: 'user'} });
+    res.json({ success: true, user: {username, pfplink, role: 'user', token: firstToken} });
   } catch (err){
     res.json({ success: false, message: 'Username already exists' })
   }
@@ -82,17 +102,40 @@ app.post("/api/login", async (req, res) => {
   const clientIP = req.headers['x-forwarded-for'] || req.ip;
 
   if (user && await bcrypt.compare(password, user.passwordhash)) {
+    const newToken = uuidv4();
+    await pool.query("UPDATE users SET token=$1 WHERE username=$2", [newToken, username])
     const banCheck = await pool.query("SELECT * FROM bans WHERE username=$1 OR ip=$2 OR token=$3",
       [username, clientIP, req.body.token])
     if (banCheck.rows.length > 0 || user.role === "banned") {
       return res.json({ success: false, message: "You are banned from this chat"})
     }
 
-    res.json ({ success: true, user: {username: user.username, pfplink: user.pfplink, role: user.role, mutestatus: user.mutestatus}})
+    res.json ({ success: true, user: {username: user.username, pfplink: user.pfplink, role: user.role, mutestatus: user.mutestatus, token: newToken}})
   } else {
     res.json ({ success: false, message: 'Invalid username or password'})
   }
   
+  })
+
+  app.post("/api/autologin", async (req, res) =>{
+    const { token } = req.body;
+    const result = await pool.query("SELECT * FROM users WHERE token=$1", [token]);
+    const user = result.rows[0];
+    if (user) {
+      res.json({ success: true, user: {
+        username: user.username,
+        pfplink: user.pfplink,
+        role: user.role,
+        mutestatus: user.mutestatus,
+        token: user.token
+      }})
+    } else {
+      res.json({ success: false, message: "Invalid token"});
+    }
+  })
+
+  app.get("/api/stickers", (req, res) => {
+    res.json(masterStickers);
   })
 
 
@@ -122,7 +165,17 @@ let bannedTokens = new Set();
 const users = {};
 
 // Handle chat connections
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
+
+  const token = socket.handshake.auth.token;
+  const result = await pool.query("SELECT * FROM users WHERE token=$1", [token]);
+  const user = result.rows[0];
+  if (!user) {
+    socket.emit("system message", {text: "Invalid token"});
+    socket.disconnect();
+    return;
+  }
+  socket.user = user;
 
   socket.on("register username", (username) =>{
     socket.username = username
@@ -326,39 +379,30 @@ io.on('connection', (socket) => {
   });
 
 
-  socket.on('chat message', async (data) => {
-     
-    const result = await pool.query(
-      "SELECT username, pfplink, role, muteStatus FROM users Where username=$1",
-      [data.username]
-    )
+  socket.on('chat message', (data) => {
+    console.log("Received chat message:", data);
+  const user = socket.user;
+  if (!user) return; // not authenticated
 
-    if (result.rows.length > 0) {
-      const user = result.rows[0];
-      
-      const enrichedMessage = {
-        username: user.username,
-        pfplink: user.pfplink,
-        role: user.role,
-        message: data.message,
-        messageId: data.messageId,
-        timeStamp: Date.now()
-      }
+  const enrichedMessage = {
+    username: user.username,
+    pfplink: user.pfplink,
+    role: user.role,
+    message: data.message,
+    messageId: data.messageId,
+    timeStamp: Date.now(),
+    replyTo: data.replyTo || null
+  };
 
-      if (data.replyTo) {
-        enrichedMessage.replyTo = data.replyTo;
-      }
+  io.emit('chat message', enrichedMessage);
 
-      io.emit('chat message', enrichedMessage);
-      
-      chatHistory.push(enrichedMessage);
-      if (chatHistory.length > 1000) chatHistory.shift()
-        
-      
-    }
+  chatHistory.push(enrichedMessage);
+  if (chatHistory.length > 1000) chatHistory.shift();
 
-    
-  });
+  console.log("ChatHistory length:", chatHistory.length);
+});
+
+
 
   socket.on("delete message", async (data) => {
     const targetMsg = chatHistory.find(msg => msg.messageId === data.messageId);
@@ -376,8 +420,18 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
   
   });
+  socket.on('logout', async(data) => {
+    const result = await pool.query("SELECT token FROM users WHERE username=$1", [data.username]);
+    const dbToken = result.rows[0]?.token;
+    if (dbToken === data.userToken) {
+      const newToken = uuidv4();
+      await pool.query("UPDATE users SET token=$1 WHERE username=$2", [newToken, data.username])
+    }
+  })
+
   });
 
+  
 cron.schedule('0 0 * * *', () => {
   chatHistory = [];
   io.emit("system message", { text: "Chat history cleared for the new day" });
