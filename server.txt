@@ -176,6 +176,7 @@ io.on('connection', async (socket) => {
     return;
   }
   socket.user = user;
+  socket.username = user.username;
 
   socket.on("register username", (username) =>{
     socket.username = username
@@ -189,11 +190,8 @@ io.on('connection', async (socket) => {
 
   socket.on("command", async (data) => {
     // get role from DB
-    const result = await pool.query(
-      "SELECT role FROM users WHERE username=$1",
-      [data.username]
-    );
-    const role = result.rows[0]?.role;
+    
+    const role = socket.user?.role;
 
    // if (!role) {
    //   socket.emit("system message", { text: "Unknown role." });
@@ -217,6 +215,13 @@ io.on('connection', async (socket) => {
           await pool.query("UPDATE users SET pfplink=$1 WHERE username=$2", [selectedPfp.url, data.username]);
           socket.emit("system message", { text: `Your profile picture was updated` });
           socket.emit("update pfp", { value: selectedPfp.url });
+          for (let [id, s] of io.sockets.sockets){
+            if (s.username === data.username) {
+              s.user.pfplink = selectedPfp.url;
+              s.emit("update pfp", { value:selectedPfp.url })
+              break;
+            }
+          }
         } else {
           socket.emit("system message", { text: "Invalid profile picture id, check /help for correct ones"})
         }
@@ -353,16 +358,21 @@ io.on('connection', async (socket) => {
           break;
 
         case "setrole":
-          if (role === "owner" && data.target && data.value) {
-            await pool.query("UPDATE users SET role=$1 WHERE username=$2", [data.value, data.target]);
-            io.emit("system message", { text: `${data.target}'s role was changed to ${data.value} by ${data.username}` });
-            for (let [id, s] of io.sockets.sockets) {
-              if (s.username === data.target) {
-                s.emit("changed role", { value: data.value });
-                break;
-              }
+         if (role === "owner" && data.target && data.value) {
+          await pool.query("UPDATE users SET role=$1 WHERE username=$2", [data.value, data.target]);
+          io.emit("system message", { text: `${data.target}'s role was changed to ${data.value} by ${data.username}` });
+
+          const updatedResult = await pool.query("SELECT * FROM users WHERE username=$1", [data.target])
+          const updatedUser = updatedResult.rows[0];
+ 
+          for (let [id, s] of io.sockets.sockets) {
+            if (s.username === data.target) {
+              s.user.role = updatedUser;         
+              s.emit("changed role", { value: data.value });
+              break;
             }
-          } else {
+          }
+        } else {
             socket.emit("system message", { text: "You don't have permission to set this role" });
           }
           break;
