@@ -20,6 +20,8 @@ const masterStickers = {
   ":1_uzi_heart:": "images/stickers/sticker-pack-1-1.png",
   ":1_uzi_sad:": "images/stickers/sticker-pack-1-2.png",
   ":1_uzi_angry:": "images/stickers/sticker-pack-1-3.png",
+  ":1_uzi_phew:": "images/stickers/sticker-pack-1-4.png",
+  ":1_uzi_uwu:": "images/stickers/sticker-pack-1-5.png",
   ":2_uzi_happy:": "images/stickers/sticker-pack-2-1.png",
   ":2_n_happy:": "images/stickers/sticker-pack-2-2.png",
   ":2_v_angry:": "images/stickers/sticker-pack-2-3.png",
@@ -121,6 +123,12 @@ app.post("/api/login", async (req, res) => {
     const { token } = req.body;
     const result = await pool.query("SELECT * FROM users WHERE token=$1", [token]);
     const user = result.rows[0];
+    const clientIP = req.headers['x-forwarded-for'] || req.ip;
+    const banCheck = await pool.query("SELECT * FROM bans WHERE username=$1 OR ip=$2 OR token=$3",
+      [user.username, clientIP, req.body.token])
+    if (banCheck.rows.length > 0 || user.role === "banned") {
+      return res.json({ success: false, message: "You are banned from this chat"})
+    }
     if (user) {
       res.json({ success: true, user: {
         username: user.username,
@@ -177,6 +185,17 @@ io.on('connection', async (socket) => {
   }
   socket.user = user;
   socket.username = user.username;
+
+  const banCheck = await pool.query(
+  "SELECT * FROM bans WHERE username=$1 OR ip=$2 OR token=$3",
+  [user.username, socket.handshake.headers['x-forwarded-for'] || socket.handshake.address, token]
+);
+if (banCheck.rows.length > 0 || user.role === "banned") {
+  socket.emit("system message", { text: "You are banned from this chat" });
+  socket.disconnect();
+  return;
+}
+
 
   socket.on("register username", (username) =>{
     socket.username = username

@@ -934,15 +934,17 @@ function showGlobalChat(data) {
     const stickersDivStickersPackDiv = document.createElement("div");
     stickersDivStickersPackDiv.className = "stickers-pack-div";
     const stickerPacks = [
-        {pack: "Sticker Pack 1"}, 
-        {pack: "Sticker Pack 2"}
+        {pack: "Sticker Pack 1", id: 1}, 
+        {pack: "Sticker Pack 2", id: 2}
     ];
     let currentPack = 1;
     i = 1;
     const stickerPack1 = [
         {name: ":1_uzi_heart:", link: "images/stickers/sticker-pack-1-1.png"},
         {name: ":1_uzi_sad:", link: "images/stickers/sticker-pack-1-2.png"},
-        {name: ":1_uzi_angry:", link: "images/stickers/sticker-pack-1-3.png"}
+        {name: ":1_uzi_angry:", link: "images/stickers/sticker-pack-1-3.png"},
+        {name: ":1_uzi_phew:", link: "images/stickers/sticker-pack-1-4.png"},
+        {name: ":1_uzi_uwu:", link: "images/stickers/sticker-pack-1-5.png"},
     ]
     const stickerPack2 = [
         {name: ":2_uzi_happy:", link: "images/stickers/sticker-pack-2-1.png"},
@@ -971,19 +973,40 @@ function showGlobalChat(data) {
     }   
 
     renderPack(stickerPack1);
-    
-    stickerPacks.forEach((pack, index) => {
-        const packs = document.createElement("p");
-        packs.textContent = pack.pack;
-        packs.addEventListener("click", () =>{
-            if (index === 0){
-                renderPack(stickerPack1);
-            } else if (index === 1){
-                renderPack(stickerPack2);
-            }
-        })
-        stickersDivStickersPackDiv.appendChild(packs);
-    });
+    let currentActive = null;
+
+stickerPacks.forEach((pack, index) => {
+  const packs = document.createElement("p");
+  packs.textContent = pack.pack;
+  packs.classList.add("pack-button");
+
+  packs.addEventListener("click", () => {
+    // remove active class from previously selected
+    if (currentActive) {
+      currentActive.classList.remove("active");
+    }
+
+    // set new active
+    packs.classList.add("active");
+    currentActive = packs;
+
+    // render the correct pack
+    if (index === 0) {
+      renderPack(stickerPack1);
+    } else if (index === 1) {
+      renderPack(stickerPack2);
+    }
+  });
+
+  if (index === 0) {
+    packs.classList.add("active");
+    currentActive = packs;
+    renderPack(stickerPack1); // render immediately
+  }
+
+  stickersDivStickersPackDiv.appendChild(packs);
+});
+
     stickerMenu.style.display = "none";
     stickerMenu.appendChild(stickersDivStickersPackDiv);
     stickerMenu.appendChild(currentStickerPack);
