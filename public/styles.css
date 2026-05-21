@@ -780,3 +780,8 @@ footer{
 .pack-button:not(.active):hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
+
+.sticker-pack-author{
+    font-size: 0.8rem;
+    opacity: 0.7;
+}

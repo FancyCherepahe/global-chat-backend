@@ -14,6 +14,11 @@ renderStickers();
 
 const main = document.querySelector("main");
 
+document.getElementById('sign-in').addEventListener('click', signInLastSavedAccount);
+
+document.getElementById('create-account').addEventListener('click', saveUserData);
+
+
 const allPfp = [{link: "/images/stock-pfp/uzi-pfp.png", text: "UZI", text_color: "#080741", id: 1},
                 {link: "/images/stock-pfp/n-pfp.png", text: "SD-N", text_color: "#51FF00", id: 2},
                 {link: "/images/stock-pfp/v-pfp.png", text: "SD-V", text_color: "#00FFF2", id: 3},
@@ -75,37 +80,43 @@ function sendMessage(inputElement) {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
-    const savedToken = localStorage.getItem("chatToken");
-    if (!savedToken) return; 
-    
-        try {
-            const response = await fetch("/api/autologin", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ token: savedToken})
-            });
-            const result = await response.json();
+  const savedToken = localStorage.getItem("chatToken");
+  if (!savedToken) {
+    // show sign-in form if no token
+    signInForm.style.display = "flex";
+    return;
+  }
 
-            if (!result.success){
-                localStorage.removeItem("chatToken");
-                signInForm.style.display = "flex";
-                console.log("Auto-login failed: ", result.message);
-                return;
-            }
+  try {
+    console.log("Autologin: sending token:", savedToken);
+    const response = await fetch("/api/autologin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: savedToken })
+    });
+    const result = await response.json();
 
-            localStorage.setItem("username", result.user.username);
-            localStorage.setItem("pfplink", result.user.pfplink);
-            localStorage.setItem("role", result.user.role);
-            localStorage.setItem("muteStatus", result.user.mutestatus);
-            localStorage.setItem("chatToken", result.user.token)
-            initSocket();
-            console.log("token ", result.user.token)
-            
-        } catch (err) {
-            console.error("Auto-login failed:", err);
-        }
+    if (!result.success) {
+      console.warn("Auto-login failed:", result.message);
+      localStorage.removeItem("chatToken");
+      signInForm.style.display = "flex";
+      return;
     }
-);
+
+    localStorage.setItem("username", result.user.username);
+    localStorage.setItem("pfplink", result.user.pfplink);
+    localStorage.setItem("role", result.user.role);
+    localStorage.setItem("muteStatus", result.user.mutestatus || "");
+    // keep the same key (server may return token or not; prefer existing savedToken)
+    if (result.user?.token) localStorage.setItem("chatToken", result.user.token);
+    initSocket();
+    console.log("Autologin success, token:", localStorage.getItem("chatToken"));
+  } catch (err) {
+    console.error("Auto-login failed:", err);
+    signInForm.style.display = "flex";
+  }
+});
+
 
 function showOnPage() {
     const allPfpCanvas = document.createElement("div");
@@ -289,6 +300,12 @@ function initSocket() {
     socket = undefined;
   }
 
+  const token = localStorage.getItem("chatToken");
+  console.log("initSocket: initializing with token:", token);
+  if (!token) {
+    console.warn("initSocket: no token found, aborting socket initialization");
+    return;
+  }
   socket = io({ auth: { token: localStorage.getItem("chatToken") } });
   
   try {
@@ -505,81 +522,81 @@ socket.on("kicked user", () => alert("You have been kicked!"));
 
 
 async function saveUserData() {
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value.trim();
-    const pfplink = morePfp.src;
-    if (!username || !password) { 
-        alert("Please fill in all fields.");
-        return;
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value.trim();
+  const pfplink = morePfp.src;
+  if (!username || !password) {
+    alert("Please fill in all fields.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, pfplink })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      localStorage.setItem("username", result.user.username);
+      localStorage.setItem("pfplink", result.user.pfplink || pfplink);
+      localStorage.setItem("role", "user");
+      localStorage.setItem("chatToken", result.user.token);
+      initSocket();
+      alert("Account Created Successfully!");
+    } else {
+      alert("Error: " + result.message);
     }
-
-    try {
-        const data = {username, password, pfplink, token}
-
-        const response = await fetch("/api/register", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username, password, pfplink, token})
-        });
-
-        const result = await response.json();
-        if (result.success){
-            localStorage.setItem("username", result.user.username);
-            localStorage.setItem("pfplink", result.user.pfplink);
-            localStorage.setItem("role", "user");
-            localStorage.setItem("chatToken", result.user.token);
-            initSocket();
-            alert("Account Created Successfully!");
-        } else {
-            alert("Error: " + result.message);
-        }
-    } catch (err) {
-        console.error("Register error:", err);
-        alert("Please fill in all fields.");
-    }
-    
+  } catch (err) {
+    console.error("Register error:", err);
+    alert("Register error");
+  }
 }
+
 
 if (localStorage.getItem("chatToken")) {
     initSocket();
 }
 
 async function signInLastSavedAccount() {
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value.trim();
-    
-    if (!username || !password) {
-        alert("Please fill in all fields.");
-        return;
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value.trim();
+
+  if (!username || !password) {
+    alert("Please fill in all fields.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      localStorage.setItem("username", result.user.username);
+      localStorage.setItem("pfplink", result.user.pfplink || morePfp.src);
+      localStorage.setItem("role", result.user.role);
+      localStorage.setItem("muteStatus", result.user.mutestatus || "");
+      // IMPORTANT: always store under "chatToken"
+      localStorage.setItem("chatToken", result.user.token);
+
+      morePfp.src = result.user.pfplink || morePfp.src;
+      initSocket();
+      alert("Signed in as: " + username);
+    } else {
+      alert("Login failed: " + result.message);
     }
-
-
-    try {
-
-        const response = await fetch("/api/login", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username, password, token: localStorage.getItem("chatToken")})
-        });
-        
-        const result = await response.json();
-        if (result.success){
-            localStorage.setItem("username", result.user.username);
-            localStorage.setItem("pfplink", result.user.pfplink);
-            localStorage.setItem("role", result.user.role);
-            localStorage.setItem("muteStatus", result.user.mutestatus);
-            localStorage.setItem("chatToken", result.user.token);
-            morePfp.src = result.user.pfplink;
-            initSocket();
-            alert("Signed in as: " + username);
-        } else {
-            alert("Login failed: " +result.message);
-        }
-    } catch (err) {
-        console.error("Login error:", err);
-        alert("Login error");
-    }
+  } catch (err) {
+    console.error("Login error:", err);
+    alert("Login error");
+  }
 }
+
     
 function renderMessage(data) {
     if (document.querySelector(`.message[data-id="${data.messageId}"]`)) {
@@ -930,13 +947,20 @@ function showGlobalChat(data) {
     stickerMenu.className = "sticker-menu";
     const stickersDivText = document.createElement("p");
     stickersDivText.textContent = "Express yourself with custom stickers!";
+      const authors = document.createElement("p");
+      const stickerPacks = [
+        {pack: "Sticker Pack 1", id: 1, author: "DenyyXX"}, 
+        {pack: "Sticker Pack 2", id: 2, author: "u/Minimum_Purpose_2042"}
+    ];
+  authors.textContent = "By: " + stickerPacks[0].author + " and " + stickerPacks[1].author;
+  authors.className = "sticker-pack-author";
+
     stickerMenu.appendChild(stickersDivText);
+      stickerMenu.appendChild(authors);
     const stickersDivStickersPackDiv = document.createElement("div");
     stickersDivStickersPackDiv.className = "stickers-pack-div";
-    const stickerPacks = [
-        {pack: "Sticker Pack 1", id: 1}, 
-        {pack: "Sticker Pack 2", id: 2}
-    ];
+    
+
     let currentPack = 1;
     i = 1;
     const stickerPack1 = [
