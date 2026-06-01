@@ -12,10 +12,14 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' ,
+  limits: {fileSize: 2 * 1024 * 1024}, // 2MB limit
+});
 const app = express();
 app.use(express.json());
 app.disable('x-powered-by');
+app.use('/uploads', express.static('uploads'));
 
 // --- Basic security headers (CSP allows external GA and socket.io) ---
 app.use(helmet({
@@ -149,8 +153,45 @@ function attachSocketRateLimiter(socket, { capacity = 5, refillInterval = 1000 }
   });
 }
 
+app.post("/api/setpfp-upload", upload.single("pfp"), async (req, res) => {
+  try {
+    const { token } = req.body; // Secure: get the user's secret chat token
+    if (!token) {
+      return res.json({ success: false, message: "Authentication token required" });
+    }
+    if (!req.file) {
+      return res.json({ success: false, message: "No file uploaded" });
+    }
+
+    // 1. Authenticate user using their secret token
+    const userLookup = await pool.query("SELECT username FROM users WHERE token=$1", [token]);
+    const user = userLookup.rows[0];
+    if (!user) {
+      return res.json({ success: false, message: "Invalid or expired session token" });
+    }
+
+    const username = user.username;
+    const pfplink = `/uploads/${req.file.filename}`;
+
+    // 2. Update the profile picture in the database
+    await pool.query("UPDATE users SET pfplink=$1 WHERE username=$2", [pfplink, username]);
+
+    // 3. Find all active socket connections belonging to this user and update them in real-time
+    for (const [sId, s] of io.sockets.sockets) {
+      if (s.user && s.user.username === username) {
+        s.user.pfplink = pfplink; // Update in-memory socket profile picture data
+        s.emit('update pfp', { value: pfplink }); // Tell the frontend to swap out the image UI
+      }
+    }
+
+    res.json({ success: true, pfplink });
+  } catch (err) {
+    console.error("setpfp upload error", err);
+    res.json({ success: false, message: "Upload failed due to server error" });
+  }
+});
 // --- API: register ---
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', upload.single('pfp'),async (req, res) => {
   try {
     const { username, password, pfplink } = req.body;
     if (!isValidUsername(username) || !password) return res.json({ success: false, message: 'Invalid input' });
@@ -164,7 +205,7 @@ app.post('/api/register', async (req, res) => {
 
     const rawToken = uuidv4();
     const passwordhash = await bcrypt.hash(password, 10);
-    const safePfp = pfplink
+    const safePfp = req.file?`/uploads/${req.file.filename}`:req.body.pfplink; 
 
     await pool.query(
       'INSERT INTO users (username, passwordhash, pfplink, role, token, createdat) VALUES ($1,$2,$3,$4,$5,NOW())',
@@ -320,10 +361,18 @@ io.on('connection', (socket) => {
         socket.emit('system message', { text: 'Invalid command' });
         return;
       }
-      const cmd = data.command.trim();
 
-      // help
-      if (cmd === 'help') {
+      // 1. Clean the command string and remove a leading slash if present
+      const rawCmd = data.command.trim();
+      const cleanCmd = rawCmd.startsWith('/') ? rawCmd.slice(1) : rawCmd;
+
+      // 2. Split by one or more whitespace characters to extract command & args cleanly
+      const parts = cleanCmd.split(/\s+/);
+      const commandName = parts[0].toLowerCase();
+      const args = parts.slice(1);
+
+      // --- help command ---
+      if (commandName === 'help') {
         const userCommands = ['tell [username] [message]', 'setpfp [id]'];
         const modCommands = ['clear', 'kick [username]', 'ban [username]', 'unban [username]', 'mute [username]', 'unmute [username]'];
         const ownerCommands = ['setrole [username] [role]'];
@@ -334,14 +383,16 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // tell
-      if (cmd.startsWith('tell')) {
-        const parts = cmd.split(' ');
-        const target = parts[1];
-        const msg = parts.slice(2).join(' ');
-        if (!target || !msg) { socket.emit('system message', { text: 'Usage: tell [username] [message]' }); return; }
+      // --- tell command ---
+      if (commandName === 'tell') {
+        const target = args[0];
+        const msg = args.slice(1).join(' ');
+        if (!target || !msg) { 
+          socket.emit('system message', { text: 'Usage: tell [username] [message]' });
+          return; 
+        }
         let found = false;
-        for (const [id, s] of io.sockets.sockets) {
+        for (const [sId, s] of io.sockets.sockets) {
           if (s.user && s.user.username === target) {
             s.emit('system message', { text: `${socket.user.username} whispers to you: ${msg}` });
             found = true;
@@ -352,48 +403,78 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // setpfp
-      if (cmd.startsWith('setpfp')) {
-        const parts = cmd.split(' ');
-        const id = parseInt(parts[1], 10);
-        const setPfpPictures = [
-          { id: 1, url: '/images/stock-pfp/uzi-pfp.png' },
-          { id: 2, url: '/images/stock-pfp/n-pfp.png' },
-          { id: 3, url: '/images/stock-pfp/v-pfp.png' },
-          { id: 4, url: '/images/stock-pfp/cyn-pfp.png' },
-          { id: 5, url: '/images/stock-pfp/lizzie-pfp.png' },
-          { id: 6, url: '/images/stock-pfp/doll-pfp.png' },
-          { id: 7, url: '/images/stock-pfp/absolute-solver-pfp.png' }
-        ];
-        const selected = setPfpPictures.find(p => p.id === id);
-        if (!selected) { socket.emit('system message', { text: 'Invalid profile picture id' }); return; }
-        await pool.query('UPDATE users SET pfplink=$1 WHERE username=$2', [selected.url, socket.user.username]);
-        socket.user.pfplink = selected.url;
-        socket.emit('system message', { text: 'Your profile picture was updated' });
-        socket.emit('update pfp', { value: selected.url });
-        for (const [id, s] of io.sockets.sockets) {
-          if (s.user && s.user.username === socket.user.username) {
-            s.user.pfplink = selected.url;
-            s.emit('update pfp', { value: selected.url });
-          }
-        }
-        return;
-      }
 
-      // privileged commands
+if (commandName === 'setpfp') {
+  const input = args[0];
+  if (!input) { 
+    socket.emit('system message', { text: 'Usage: /setpfp [1-7], /setpfp [URL], or /setpfp upload' });
+    return; 
+  }
+
+ 
+  if (input.toLowerCase() === 'upload') {
+    socket.emit('trigger pfp file picker');
+    return;
+  }
+
+  let newPfpUrl = null;
+  const pfpId = parseInt(input, 10);
+  
+  const setPfpPictures = [
+    { id: 1, url: '/images/stock-pfp/uzi-pfp.png' },
+    { id: 2, url: '/images/stock-pfp/n-pfp.png' },
+    { id: 3, url: '/images/stock-pfp/v-pfp.png' },
+    { id: 4, url: '/images/stock-pfp/cyn-pfp.png' },
+    { id: 5, url: '/images/stock-pfp/lizzie-pfp.png' },
+    { id: 6, url: '/images/stock-pfp/doll-pfp.png' },
+    { id: 7, url: '/images/stock-pfp/absolute-solver-pfp.png' }
+  ];
+
+  if (!isNaN(pfpId)) {
+    const selected = setPfpPictures.find(p => p.id === pfpId);
+    if (selected) newPfpUrl = selected.url;
+  }
+
+  if (!newPfpUrl) {
+    if (input.startsWith('http://') || input.startsWith('https://') || input.startsWith('/uploads/')) {
+      newPfpUrl = input;
+    } else {
+      socket.emit('system message', { text: 'Invalid ID, link, or sub-command. Try /setpfp upload' });
+      return;
+    }
+  }
+
+  await pool.query('UPDATE users SET pfplink=$1 WHERE username=$2', [newPfpUrl, socket.user.username]);
+  socket.user.pfplink = newPfpUrl;
+  socket.emit('system message', { text: 'Your profile picture was updated!' });
+  
+  for (const [sId, s] of io.sockets.sockets) {
+    if (s.user && s.user.username === socket.user.username) {
+      s.user.pfplink = newPfpUrl;
+      s.emit('update pfp', { value: newPfpUrl });
+    }
+  }
+  return;
+}
+      // --- Privileged commands (owner / moderator) ---
       if (role === 'owner' || role === 'moderator') {
-        if (cmd === 'clear') {
+        
+        // clear command
+        if (commandName === 'clear') {
           chatHistory = [];
           io.emit('clear chat');
           io.emit('system message', { text: `Chat history was cleared by ${socket.user.username}` });
           return;
         }
 
-        if (cmd.startsWith('kick')) {
-          const parts = cmd.split(' ');
-          const target = parts[1];
-          if (!target) { socket.emit('system message', { text: 'Usage: kick [username]' }); return; }
-          for (const [id, s] of io.sockets.sockets) {
+        // kick command
+        if (commandName === 'kick') {
+          const target = args[0];
+          if (!target) { 
+            socket.emit('system message', { text: 'Usage: kick [username]' }); 
+            return;
+          }
+          for (const [sId, s] of io.sockets.sockets) {
             if (s.user && s.user.username === target) {
               s.emit('kicked user');
               s.disconnect(true);
@@ -404,95 +485,123 @@ io.on('connection', (socket) => {
           return;
         }
 
-        if (cmd.startsWith('ban')) {
-          const parts = cmd.split(' ');
-          const target = parts[1];
-          if (!target) { socket.emit('system message', { text: 'Usage: ban [username]' }); return; }
+        // ban command
+        // --- ban command ---
+if (commandName === 'ban') {
+  const target = args[0];
+  if (!target) { 
+    socket.emit('system message', { text: 'Usage: ban [username]' });
+    return;
+  }
 
-          const r = await pool.query('SELECT role FROM users WHERE username=$1', [target]);
-          if (r.rows.length === 0) { socket.emit('system message', { text: 'User not found' }); return; }
-          const targetRole = r.rows[0].role;
-          if (targetRole === 'owner' || targetRole === 'moderator') { socket.emit('system message', { text: 'Cannot ban owner/moderator' }); return; }
+  const r = await pool.query('SELECT role, token FROM users WHERE username=$1', [target]);
+  if (r.rows.length === 0) { 
+    socket.emit('system message', { text: 'User not found' });
+    return;
+  }
+  const targetUser = r.rows[0];
+  if (targetUser.role === 'owner' || targetUser.role === 'moderator') { 
+    socket.emit('system message', { text: 'Cannot ban owner/moderator' });
+    return;
+  }
 
-          await pool.query('UPDATE users SET role=$1 WHERE username=$2', ['banned', target]);
+  // 1. Update database role
+  await pool.query('UPDATE users SET role=$1 WHERE username=$2', ['banned', target]);
 
-          // hash the admin's IP for storage (we store hashed IP only)
-          const clientIP = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address || '';
-          const ipHash = hashIp(clientIP);
+  // 2. Find target's active socket to capture THEIR IP and disconnect them
+  let targetIpHash = null;
+  const targetToken = targetUser.token;
 
-          // store ban row: username + hashed ip; token column left for compatibility (we store raw token if available)
-          const adminRawToken = socket.handshake.auth?.token || null;
-          await pool.query('INSERT INTO bans (username, ip, token) VALUES ($1,$2,$3)', [target, ipHash, adminRawToken]);
+  for (const [sId, s] of io.sockets.sockets) {
+    if (s.user && s.user.username === target) {
+      const clientIP = s.handshake.headers['x-forwarded-for'] || s.handshake.address || '';
+      targetIpHash = hashIp(clientIP);
+      
+      s.emit('system message', { text: 'You have been banned' });
+      s.disconnect(true);
+    }
+  }
 
-          bannedIPs.add(ipHash);
-          if (adminRawToken) bannedTokens.add(adminRawToken);
+  // 3. Save the TARGET's data to the bans table (fallback to null if offline)
+  await pool.query('INSERT INTO bans (username, ip, token) VALUES ($1, $2, $3)', [target, targetIpHash, targetToken]);
 
-          for (const [id, s] of io.sockets.sockets) {
-            if (s.user && s.user.username === target) {
-              s.emit('system message', { text: 'You have been banned' });
-              s.disconnect(true);
-            }
+  if (targetIpHash) bannedIPs.add(targetIpHash);
+  if (targetToken) bannedTokens.add(targetToken);
+
+  io.emit('system message', { text: `${target} was banned by ${socket.user.username}` });
+  return;
+}
+
+        // unban command
+        if (commandName === 'unban') {
+          const target = args[0];
+          if (!target) { 
+            socket.emit('system message', { text: 'Usage: unban [username]' }); 
+            return;
           }
-          io.emit('system message', { text: `${target} was banned by ${socket.user.username}` });
-          return;
-        }
-
-        if (cmd.startsWith('unban')) {
-          const parts = cmd.split(' ');
-          const target = parts[1];
-          if (!target) { socket.emit('system message', { text: 'Usage: unban [username]' }); return; }
 
           await pool.query('UPDATE users SET role=$1 WHERE username=$2', ['user', target]);
           const banTruth = await pool.query('SELECT ip, token FROM bans WHERE username=$1', [target]);
           await pool.query('DELETE FROM bans WHERE username=$1', [target]);
-
           if (banTruth.rows.length > 0) {
             const { ip, token } = banTruth.rows[0];
             if (ip) bannedIPs.delete(ip);
             if (token) bannedTokens.delete(token);
           }
 
-          for (const [id, s] of io.sockets.sockets) {
+          for (const [sId, s] of io.sockets.sockets) {
             if (s.user && s.user.username === target) s.emit('unbanned');
           }
           io.emit('system message', { text: `${target} was unbanned by ${socket.user.username}` });
           return;
         }
 
-        if (cmd.startsWith('mute')) {
-          const parts = cmd.split(' ');
-          const target = parts[1];
-          if (!target) { socket.emit('system message', { text: 'Usage: mute [username]' }); return; }
+        // mute command
+        if (commandName === 'mute') {
+          const target = args[0];
+          if (!target) { 
+            socket.emit('system message', { text: 'Usage: mute [username]' }); 
+            return;
+          }
           await pool.query('UPDATE users SET mutestatus=$1 WHERE username=$2', ['muted', target]);
           io.emit('system message', { text: `${target} was muted by ${socket.user.username}` });
-          for (const [id, s] of io.sockets.sockets) {
+          for (const [sId, s] of io.sockets.sockets) {
             if (s.user && s.user.username === target) s.emit('muted', { target });
           }
           return;
         }
 
-        if (cmd.startsWith('unmute')) {
-          const parts = cmd.split(' ');
-          const target = parts[1];
-          if (!target) { socket.emit('system message', { text: 'Usage: unmute [username]' }); return; }
+        // unmute command
+        if (commandName === 'unmute') {
+          const target = args[0];
+          if (!target) { 
+            socket.emit('system message', { text: 'Usage: unmute [username]' }); 
+            return;
+          }
           await pool.query('UPDATE users SET mutestatus=$1 WHERE username=$2', ['unmuted', target]);
           io.emit('system message', { text: `${target} was unmuted by ${socket.user.username}` });
-          for (const [id, s] of io.sockets.sockets) {
+          for (const [sId, s] of io.sockets.sockets) {
             if (s.user && s.user.username === target) s.emit('unmuted');
           }
           return;
         }
 
-        if (cmd.startsWith('setrole')) {
-          const parts = cmd.split(' ');
-          const target = parts[1];
-          const value = parts[2];
-          if (socket.user.role !== 'owner') { socket.emit('system message', { text: 'You do not have permission' }); return; }
-          if (!target || !value) { socket.emit('system message', { text: 'Usage: setrole [username] [role]' }); return; }
+        // setrole command
+        if (commandName === 'setrole') {
+          const target = args[0];
+          const value = args[1];
+          if (socket.user.role !== 'owner') { 
+            socket.emit('system message', { text: 'You do not have permission' });
+            return; 
+          }
+          if (!target || !value) { 
+            socket.emit('system message', { text: 'Usage: setrole [username] [role]' });
+            return; 
+          }
           await pool.query('UPDATE users SET role=$1 WHERE username=$2', [value, target]);
           const updated = await pool.query('SELECT * FROM users WHERE username=$1', [target]);
           const updatedUser = updated.rows[0];
-          for (const [id, s] of io.sockets.sockets) {
+          for (const [sId, s] of io.sockets.sockets) {
             if (s.user && s.user.username === target) {
               s.user = { id: updatedUser.id, username: updatedUser.username, pfplink: updatedUser.pfplink, role: updatedUser.role, muteStatus: updatedUser.mutestatus };
               s.emit('changed role', { value });
@@ -502,6 +611,7 @@ io.on('connection', (socket) => {
           return;
         }
       } // end privileged
+
       socket.emit('system message', { text: 'Unknown or unauthorized command' });
     } catch (err) {
       console.error('Command handler error', err);

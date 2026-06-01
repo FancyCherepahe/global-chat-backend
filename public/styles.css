@@ -785,3 +785,47 @@ footer{
     font-size: 0.8rem;
     opacity: 0.7;
 }
+
+.download-img{
+    width: 50px;
+    height: 50px;
+}
+
+.custom-pfp-input{
+    display: none;
+}
+
+.custom-pfp-input-label{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    background: #6a0dad;
+    color: rgb(0, 0, 0);
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: large;
+}
+
+.all-stock-pfp-div{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.custom-pfp-div{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.account-pfp{
+    width: 150px;
+}

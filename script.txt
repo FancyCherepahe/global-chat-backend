@@ -80,42 +80,79 @@ function sendMessage(inputElement) {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
-    const savedToken = localStorage.getItem("chatToken");
-    if (!savedToken) return; 
-    
-        try {
-          const token = localStorage.getItem("chatToken");
-            const response = await fetch("/api/autologin", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ token: savedToken})
-            });
-            const result = await response.json();
+  const savedToken = localStorage.getItem("chatToken");
+  if (!savedToken) {
+    // show sign-in form if no token
+    signInForm.style.display = "flex";
+    return;
+  }
 
-            if (!result.success){
-                localStorage.removeItem("chatToken");
-                signInForm.style.display = "flex";
-                console.log("Auto-login failed: ", result.message);
-                return;
-            }
+  try {
+    console.log("Autologin: sending token:", savedToken);
+    const response = await fetch("/api/autologin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: savedToken })
+    });
+    const result = await response.json();
 
-            localStorage.setItem("username", result.user.username);
-            localStorage.setItem("pfplink", result.user.pfplink);
-            localStorage.setItem("role", result.user.role);
-            localStorage.setItem("muteStatus", result.user.mutestatus);
-            localStorage.setItem("chatToken", result.user.token)
-            initSocket();
-            console.log("token ", result.user.token)
-            
-        } catch (err) {
-            console.error("Auto-login failed:", err);
-        }
+    if (!result.success) {
+      console.warn("Auto-login failed:", result.message);
+      localStorage.removeItem("chatToken");
+      signInForm.style.display = "flex";
+      return;
     }
-);
+
+    localStorage.setItem("username", result.user.username);
+    localStorage.setItem("pfplink", result.user.pfplink);
+    localStorage.setItem("role", result.user.role);
+    localStorage.setItem("muteStatus", result.user.mutestatus || "");
+    // keep the same key (server may return token or not; prefer existing savedToken)
+    if (result.user?.token) localStorage.setItem("chatToken", result.user.token);
+    initSocket();
+    console.log("Autologin success, token:", localStorage.getItem("chatToken"));
+  } catch (err) {
+    console.error("Auto-login failed:", err);
+    signInForm.style.display = "flex";
+  }
+});
+
 
 function showOnPage() {
     const allPfpCanvas = document.createElement("div");
         allPfpCanvas.className = "all-pfp-canvas";
+        const customPfpDiv = document.createElement("div");
+        customPfpDiv.className = "custom-pfp-div";
+        const customPfp = document.createElement("input");
+        customPfp.type = "file";
+        customPfp.className = "custom-pfp-input"
+        customPfp.accept = "image/*";
+        customPfp.id = "customPfp"
+        const customPfpUploadButton = document.createElement("button");
+        customPfpUploadButton.textContent = "Upload You Profile Picture!";
+        customPfpUploadButton.className = "custom-pfp-input-label"
+        allPfpCanvas.appendChild(customPfpUploadButton);
+        customPfpUploadButton.addEventListener('click', () => customPfp.click());
+        const customPfpImg = document.createElement("img");
+        customPfpImg.src = "/images/icons/download.svg";
+        customPfpImg.className = "download-img";
+        const customPfpPreview = document.createElement("div");
+        customPfpPreview.addEventListener("click", (file, e) => {
+                morePfp.src = e.target.result;
+                allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
+                setTimeout(() => {
+                    allPfpCanvas.style.display = "none";
+                    allPfpCanvas.style.animation = "none";
+                    signInForm.style.animation = "fadeIn 0.7s forwards";
+                    signInForm.style.display = "flex";
+                }, 700);
+            });
+        customPfpDiv.appendChild(customPfp);
+        customPfpDiv.appendChild(customPfpUploadButton);
+        customPfpDiv.appendChild(customPfpPreview);
+        allPfpCanvas.appendChild(customPfpDiv);
+        const stockPfpDiv = document.createElement("div")
+        stockPfpDiv.className = "all-stock-pfp-div";
         allPfp.forEach((pfpSrc) => {
             const pfpDiv = document.createElement("div");
             pfpDiv.className = "pfp-div";
@@ -152,9 +189,45 @@ function showOnPage() {
                 pfpText.style.color = pfpSrc.text_color;
             }
             pfpDiv.appendChild(pfpText);
-            allPfpCanvas.appendChild(pfpDiv);
+            stockPfpDiv.appendChild(pfpDiv);
            
         });
+        allPfpCanvas.appendChild(stockPfpDiv)
+       
+customPfp.addEventListener('change', function(event) {
+    const files = event.target.files;
+
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) { 
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.alt = 'image preview';
+                img.style.maxWidth = '200px';
+                img.style.margin = '10px';
+                img.style.display = 'inline-block'; // stack side by side
+                
+                img.addEventListener('click', () => {
+          morePfp.src = img.src;
+          allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
+          setTimeout(() => {
+            allPfpCanvas.style.display = "none";
+            allPfpCanvas.style.animation = "none";
+            signInForm.style.animation = "fadeIn 0.7s forwards";
+            signInForm.style.display = "flex";
+          }, 700);
+        });
+        customPfpPreview.appendChild(img);
+            };
+
+            reader.readAsDataURL(file);
+        } else {
+            alert('Please select only image files.');
+        }
+    });
+});
         main.appendChild(allPfpCanvas);
 signInForm.style.animation = "fadeOut 0.7s forwards";
     setTimeout(() => {
@@ -172,7 +245,7 @@ const usernameInput = document.querySelector("#username");
 const passwordInput = document.querySelector("#password");
 const pfpInput = document.querySelector("#pfp-link");
 
-const token = localSfetorage.getItem("chatToken");
+const token = localStorage.getItem("chatToken");
 
 //function initSocket(data) {
 //    if (socket) {
@@ -295,6 +368,12 @@ function initSocket() {
     socket = undefined;
   }
 
+  const token = localStorage.getItem("chatToken");
+  console.log("initSocket: initializing with token:", token);
+  if (!token) {
+    console.warn("initSocket: no token found, aborting socket initialization");
+    return;
+  }
   socket = io({ auth: { token: localStorage.getItem("chatToken") } });
   
   try {
@@ -511,89 +590,94 @@ socket.on("kicked user", () => alert("You have been kicked!"));
 
 
 async function saveUserData() {
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value.trim();
-    const pfplink = morePfp.src;
-    if (!username || !password) { 
-        alert("Please fill in all fields.");
-        return;
-    }
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value.trim();
+  const pfplink = morePfp.src;
+  if (!username || !password) {
+    alert("Please fill in all fields.");
+    return;
+  }
 
-    try {
-        const data = {username, password, pfplink, token}
+  try {
+  let response;
+  if (customPfp.files.length > 0) {
+    // user uploaded a file
+    const formData = new FormData();
+    formData.append("username", username);
+    formData.append("password", password);
+    formData.append("pfp", customPfp.files[0]);
 
-        const response = await fetch("/api/register", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username, password, pfplink, token})
-        });
+    response = await fetch("/api/register", { method: "POST", body: formData });
+  } else {
+    // user picked stock pfp
+    response = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, pfplink })
+    });
+  }
 
-        const result = await response.json();
-        if (result.success){
-            localStorage.setItem("username", result.user.username);
-            localStorage.setItem("pfplink", result.user.pfplink);
-            localStorage.setItem("role", "user");
-            localStorage.setItem("chatToken", result.user.token);
-            initSocket();
-            alert("Account Created Successfully!");
-        } else {
-            alert("Error: " + result.message);
-        }
-    } catch (err) {
-        console.error("Register error:", err);
-        alert("Please fill in all fields.");
-    }
-    
+  const result = await response.json();
+  if (result.success) {
+    localStorage.setItem("username", result.user.username);
+    localStorage.setItem("pfplink", result.user.pfplink || pfplink);
+    localStorage.setItem("role", "user");
+    localStorage.setItem("chatToken", result.user.token);
+    initSocket();
+    alert("Account Created Successfully!");
+  } else {
+    alert("Error: " + result.message);
+  }
+} catch (err) {
+  console.error("Register error:", err);
+  alert("Register error");
 }
+
+}
+
 
 if (localStorage.getItem("chatToken")) {
     initSocket();
 }
 
 async function signInLastSavedAccount() {
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value.trim();
-    
-    if (!username || !password) {
-        alert("Please fill in all fields.");
-        return;
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value.trim();
+
+  if (!username || !password) {
+    alert("Please fill in all fields.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      localStorage.setItem("username", result.user.username);
+      localStorage.setItem("pfplink", result.user.pfplink || morePfp.src);
+      localStorage.setItem("role", result.user.role);
+      localStorage.setItem("muteStatus", result.user.mutestatus || "");
+      // IMPORTANT: always store under "chatToken"
+      localStorage.setItem("chatToken", result.user.token);
+
+      morePfp.src = result.user.pfplink || morePfp.src;
+      initSocket();
+      alert("Signed in as: " + username);
+    } else {
+      alert("Login failed: " + result.message);
     }
-
-
-    try {
-
-        const response = await fetch("/api/login", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username, password, token: localStorage.getItem("chatToken")})
-        }
-      .then(res => res.json())
-      .then(data => {
-    if (data.success) {
-      localStorage.setItem('token', data.user.token);
-    }}
-      ));
-
-        
-        
-        const result = await response.json();
-        if (result.success){
-            localStorage.setItem("username", result.user.username);
-            localStorage.setItem("pfplink", result.user.pfplink);
-            localStorage.setItem("role", result.user.role);
-            localStorage.setItem("muteStatus", result.user.mutestatus);
-            localStorage.setItem("chatToken", result.user.token);
-            morePfp.src = result.user.pfplink;
-            initSocket();
-            alert("Signed in as: " + username);
-        } else {
-            alert("Login failed: " +result.message);
-        }
-    } catch (err) {
-        console.error("Login error:", err);
-        alert("Login error");
-    }
+  } catch (err) {
+    console.error("Login error:", err);
+    alert("Login error");
+  }
 }
+
     
 function renderMessage(data) {
     if (document.querySelector(`.message[data-id="${data.messageId}"]`)) {
@@ -944,13 +1028,20 @@ function showGlobalChat(data) {
     stickerMenu.className = "sticker-menu";
     const stickersDivText = document.createElement("p");
     stickersDivText.textContent = "Express yourself with custom stickers!";
+      const authors = document.createElement("p");
+      const stickerPacks = [
+        {pack: "Sticker Pack 1", id: 1, author: "DenyyXX"}, 
+        {pack: "Sticker Pack 2", id: 2, author: "u/Minimum_Purpose_2042"}
+    ];
+  authors.textContent = "By: " + stickerPacks[0].author + " and " + stickerPacks[1].author;
+  authors.className = "sticker-pack-author";
+
     stickerMenu.appendChild(stickersDivText);
+      stickerMenu.appendChild(authors);
     const stickersDivStickersPackDiv = document.createElement("div");
     stickersDivStickersPackDiv.className = "stickers-pack-div";
-    const stickerPacks = [
-        {pack: "Sticker Pack 1", id: 1}, 
-        {pack: "Sticker Pack 2", id: 2}
-    ];
+    
+
     let currentPack = 1;
     i = 1;
     const stickerPack1 = [
@@ -1055,7 +1146,29 @@ stickerPacks.forEach((pack, index) => {
         signInForm.style.animation = "none";
         globalChatDiv.style.animation = "fadeIn 0.7s forwards";
     }, 700);
-    
+    const hiddenFileInput = document.createElement('input');
+hiddenFileInput.type = 'file';
+hiddenFileInput.accept = 'image/*';
+hiddenFileInput.style.display = 'none';
+hiddenFileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("pfp", file);
+  formData.append("username", localStorage.getItem("username"));
+
+  fetch("/api/setpfp-upload", { method:"POST", body: formData })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        socket.emit("update pfp", { value: result.pfplink });
+      }
+    });
+});
+
+document.body.appendChild(hiddenFileInput);
+
 }
 
 document.addEventListener("keydown", (event) => {

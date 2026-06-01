@@ -37,46 +37,27 @@ function sendMessage(inputElement) {
     return;
   }
 
-  if (message.startsWith("/")) {
-    const parts = message.split(" ");
-    const command = parts[0].substring(1);
-    let target = null;
-    let value = null;
+  if (message.trim().startsWith("/")) {
+  // Pass the entire untampered command string to the server
+  socket.emit("command", {
+    command: message.trim()
+  });
+  inputElement.value = "";
+} else {
+  const payload = {
+    messageId: crypto.randomUUID(),
+    message,
+    replyTo: replyStatus ? {
+      username: replyString[0],
+      message: replyString[1]
+    } : null,
+    timeStamp: new Date().toISOString()
+  };
 
-    if (command === "tell") {
-      target = parts[1];
-      value = parts.slice(2).join(" ").trim();
-    } else if (command === "setrole") {
-      target = parts.slice(1, -1).join(" ").trim();
-      value = parts[parts.length - 1];
-    } else if (command === "setpfp") {
-      value = parts[1];
-    } else {
-      target = parts.slice(1).join(" ").trim() || null;
-    }
-
-    socket.emit("command", {
-      username: localStorage.getItem("username"),
-      token: localStorage.getItem("chatToken"),
-      command,
-      target,
-      value
-    });
-  } else {
-    const payload = {
-      messageId: crypto.randomUUID(),  //1
-      message,  //2
-      replyTo: replyStatus ? {
-        username: replyString[0],
-        message: replyString[1]
-      } : null, //3
-      timeStamp: new Date().toISOString() //4
-    };
-
-    console.log(payload)
-    socket.emit("chat message", payload);
-    inputElement.value = "";
-  }
+  (payload);
+  socket.emit("chat message", payload);
+  inputElement.value = "";
+}
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
@@ -88,7 +69,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   try {
-    console.log("Autologin: sending token:", savedToken);
+    ("Autologin: sending token:", savedToken);
     const response = await fetch("/api/autologin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -110,7 +91,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     // keep the same key (server may return token or not; prefer existing savedToken)
     if (result.user?.token) localStorage.setItem("chatToken", result.user.token);
     initSocket();
-    console.log("Autologin success, token:", localStorage.getItem("chatToken"));
+    ("Autologin success, token:", localStorage.getItem("chatToken"));
   } catch (err) {
     console.error("Auto-login failed:", err);
     signInForm.style.display = "flex";
@@ -121,6 +102,38 @@ window.addEventListener("DOMContentLoaded", async () => {
 function showOnPage() {
     const allPfpCanvas = document.createElement("div");
         allPfpCanvas.className = "all-pfp-canvas";
+        const customPfpDiv = document.createElement("div");
+        customPfpDiv.className = "custom-pfp-div";
+        const customPfp = document.createElement("input");
+        customPfp.type = "file";
+        customPfp.className = "custom-pfp-input"
+        customPfp.accept = "image/*";
+        customPfp.id = "customPfp"
+        const customPfpUploadButton = document.createElement("button");
+        customPfpUploadButton.textContent = "Upload You Profile Picture!";
+        customPfpUploadButton.className = "custom-pfp-input-label"
+        allPfpCanvas.appendChild(customPfpUploadButton);
+        customPfpUploadButton.addEventListener('click', () => customPfp.click());
+        const customPfpImg = document.createElement("img");
+        customPfpImg.src = "/images/icons/download.svg";
+        customPfpImg.className = "download-img";
+        const customPfpPreview = document.createElement("div");
+        customPfpPreview.addEventListener("click", (file, e) => {
+                morePfp.src = e.target.result;
+                allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
+                setTimeout(() => {
+                    allPfpCanvas.style.display = "none";
+                    allPfpCanvas.style.animation = "none";
+                    signInForm.style.animation = "fadeIn 0.7s forwards";
+                    signInForm.style.display = "flex";
+                }, 700);
+            });
+        customPfpDiv.appendChild(customPfp);
+        customPfpDiv.appendChild(customPfpUploadButton);
+        customPfpDiv.appendChild(customPfpPreview);
+        allPfpCanvas.appendChild(customPfpDiv);
+        const stockPfpDiv = document.createElement("div")
+        stockPfpDiv.className = "all-stock-pfp-div";
         allPfp.forEach((pfpSrc) => {
             const pfpDiv = document.createElement("div");
             pfpDiv.className = "pfp-div";
@@ -157,9 +170,45 @@ function showOnPage() {
                 pfpText.style.color = pfpSrc.text_color;
             }
             pfpDiv.appendChild(pfpText);
-            allPfpCanvas.appendChild(pfpDiv);
+            stockPfpDiv.appendChild(pfpDiv);
            
         });
+        allPfpCanvas.appendChild(stockPfpDiv)
+       
+customPfp.addEventListener('change', function(event) {
+    const files = event.target.files;
+
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) { 
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.alt = 'image preview';
+                img.style.maxWidth = '200px';
+                img.style.margin = '10px';
+                img.style.display = 'inline-block'; // stack side by side
+                
+                img.addEventListener('click', () => {
+          morePfp.src = img.src;
+          allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
+          setTimeout(() => {
+            allPfpCanvas.style.display = "none";
+            allPfpCanvas.style.animation = "none";
+            signInForm.style.animation = "fadeIn 0.7s forwards";
+            signInForm.style.display = "flex";
+          }, 700);
+        });
+        customPfpPreview.appendChild(img);
+            };
+
+            reader.readAsDataURL(file);
+        } else {
+            alert('Please select only image files.');
+        }
+    });
+});
         main.appendChild(allPfpCanvas);
 signInForm.style.animation = "fadeOut 0.7s forwards";
     setTimeout(() => {
@@ -186,7 +235,7 @@ const token = localStorage.getItem("chatToken");
 //    }
 //    socket = io({auth: {token: localStorage.getItem("chatToken")}});
 //    socket.on("connect", ()=>{
-//        console.log(socket.id);
+//        (socket.id);
 //   
 //            socket.emit("register username", localStorage.getItem("username"));
 //            showGlobalChat();
@@ -199,7 +248,7 @@ const token = localStorage.getItem("chatToken");
 //    });
 //    
 //    socket.on("chat history", (history) => {
-//        console.log(history.length);
+//        (history.length);
 //        history.forEach(renderMessage);
 //    });
 //    
@@ -301,7 +350,7 @@ function initSocket() {
   }
 
   const token = localStorage.getItem("chatToken");
-  console.log("initSocket: initializing with token:", token);
+  ("initSocket: initializing with token:", token);
   if (!token) {
     console.warn("initSocket: no token found, aborting socket initialization");
     return;
@@ -310,7 +359,7 @@ function initSocket() {
   
   try {
 
-    console.log("initSocket: connecting with token:", localStorage.getItem("chatToken"));
+    ("initSocket: connecting with token:", localStorage.getItem("chatToken"));
 
     // remove any leftover handlers (defensive)
     socket.off("chat history");
@@ -355,7 +404,7 @@ function initSocket() {
       }
     }
 socket.on("disconnect", (reason) => {
-    console.log("initSocket: disconnected", reason);
+    ("initSocket: disconnected", reason);
     socketInitialized = false;
     socket = undefined;
   });
@@ -368,7 +417,7 @@ socket.on("disconnect", (reason) => {
     }
   });
 socket.on("chat history", (history) => {
-  console.log("initSocket: received history length:", history?.length);
+  ("initSocket: received history length:", history?.length);
   // defensive: ensure messages container exists
   if (!document.getElementById("messages")) {
     // wait a short tick for showGlobalChat to create UI
@@ -397,7 +446,7 @@ socket.on("clear chat", () => {
 });
 
 socket.on("muted", (data) => {
-  console.log("Received muted event", data);
+  ("Received muted event", data);
   localStorage.setItem("muteStatus", "muted");
   setMutedUI(true);
   const messages = document.getElementById("messages");
@@ -410,7 +459,7 @@ socket.on("muted", (data) => {
 });
 
 socket.on("unmuted", (data) => {
-  console.log("Received unmuted event", data);
+  ("Received unmuted event", data);
   localStorage.removeItem("muteStatus");
   setMutedUI(false);
   const messages = document.getElementById("messages");
@@ -423,7 +472,7 @@ socket.on("unmuted", (data) => {
 });
 
 socket.on("changed role", (data) => {
-    console.log ("received role: ", data.value);
+     ("received role: ", data.value);
   if (data?.value) {
     localStorage.setItem("role", data.value);
     const roleText = document.getElementById("role-text");
@@ -465,12 +514,12 @@ function requestHistoryWithRetry(retries = 2, delay = 700) {
 
 
 socket.on("kicked user", () => alert("You have been kicked!"));
-    console.log("initSocket: socket object created (pending connect):", !!socket);
+    ("initSocket: socket object created (pending connect):", !!socket);
   } catch (err) {
     console.error("initSocket: threw error", err);
   }
   socket.on("connect", () => {
-  console.log("Socket connected:", socket.id);
+  ("Socket connected:", socket.id);
   socket.emit("register username", localStorage.getItem("username"));
 
   // Build UI synchronously
@@ -496,7 +545,7 @@ socket.on("kicked user", () => alert("You have been kicked!"));
   (async () => {
     try {
       await waitForMessagesContainer(2000);
-      console.log("messages container ready — requesting history");
+      ("messages container ready — requesting history");
       socket.emit("request history");
     } catch (err) {
       console.warn("messages container not ready, still requesting history", err);
@@ -513,7 +562,7 @@ socket.on("kicked user", () => alert("You have been kicked!"));
        stickerButton.disabled = true;
        input.placeholder = "You are muted";
      }
-     console.log("User is muted, hiding message input.")   
+     ("User is muted, hiding message input.")   
     }
 });
 
@@ -531,27 +580,40 @@ async function saveUserData() {
   }
 
   try {
-    const response = await fetch("/api/register", {
+  let response;
+  if (customPfp.files.length > 0) {
+    // user uploaded a file
+    const formData = new FormData();
+    formData.append("username", username);
+    formData.append("password", password);
+    formData.append("pfp", customPfp.files[0]);
+
+    response = await fetch("/api/register", { method: "POST", body: formData });
+  } else {
+    // user picked stock pfp
+    response = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password, pfplink })
     });
-
-    const result = await response.json();
-    if (result.success) {
-      localStorage.setItem("username", result.user.username);
-      localStorage.setItem("pfplink", result.user.pfplink || pfplink);
-      localStorage.setItem("role", "user");
-      localStorage.setItem("chatToken", result.user.token);
-      initSocket();
-      alert("Account Created Successfully!");
-    } else {
-      alert("Error: " + result.message);
-    }
-  } catch (err) {
-    console.error("Register error:", err);
-    alert("Register error");
   }
+
+  const result = await response.json();
+  if (result.success) {
+    localStorage.setItem("username", result.user.username);
+    localStorage.setItem("pfplink", result.user.pfplink || pfplink);
+    localStorage.setItem("role", "user");
+    localStorage.setItem("chatToken", result.user.token);
+    initSocket();
+    alert("Account Created Successfully!");
+  } else {
+    alert("Error: " + result.message);
+  }
+} catch (err) {
+  console.error("Register error:", err);
+  alert("Register error");
+}
+
 }
 
 
@@ -1065,7 +1127,41 @@ stickerPacks.forEach((pack, index) => {
         signInForm.style.animation = "none";
         globalChatDiv.style.animation = "fadeIn 0.7s forwards";
     }, 700);
-    
+    const hiddenFileInput = document.createElement('input');
+hiddenFileInput.type = 'file';
+hiddenFileInput.accept = 'image/*';
+hiddenFileInput.style.display = 'none';
+hiddenFileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("pfp", file);
+  // SECURE CHANGE: Pass the secret chatToken instead of the username
+  formData.append("token", localStorage.getItem("chatToken")); 
+
+  fetch("/api/setpfp-upload", { method: "POST", body: formData })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        ("Custom profile picture uploaded and synced across tabs successfully!");
+        // Note: You no longer need to call socket.emit() here manually, 
+        // because the server now safely triggers it backend-side!
+      } else {
+        alert(result.message || "Upload failed");
+      }
+    })
+    .catch(err => {
+      console.error("Upload error:", err);
+      alert("An error occurred during file upload.");
+    });
+});
+document.body.appendChild(hiddenFileInput);
+socket.on('trigger pfp file picker', () => {
+    // When the server tells us to, open the file explorer prompt!
+    hiddenFileInput.click();
+});
+
 }
 
 document.addEventListener("keydown", (event) => {
