@@ -1,11 +1,12 @@
 {
   "name": "server",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
-  "main": "server.cjs",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.cjs"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +27,7 @@
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
     "pg": "^8.21.0",
+    "require": "^0.4.4",
     "socket.io": "^4.8.3",
     "sqlite": "^5.1.1",
     "sqlite3": "^6.0.1",

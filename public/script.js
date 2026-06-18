@@ -47,7 +47,7 @@ function sendMessage(inputElement) {
   const payload = {
     messageId: crypto.randomUUID(),
     message,
-    replyTo: replyStatus ? {
+    replyto: replyStatus ? {
       username: replyString[0],
       message: replyString[1]
     } : null,
@@ -418,12 +418,6 @@ socket.on("disconnect", (reason) => {
   });
 socket.on("chat history", (history) => {
   ("initSocket: received history length:", history?.length);
-  // defensive: ensure messages container exists
-  if (!document.getElementById("messages")) {
-    // wait a short tick for showGlobalChat to create UI
-    requestAnimationFrame(() => history.forEach(renderMessage));
-    return;
-  }
   history.forEach(renderMessage);
 });
 socket.on("chat message", (data) => {
@@ -589,6 +583,10 @@ async function saveUserData() {
     formData.append("pfp", customPfp.files[0]);
 
     response = await fetch("/api/register", { method: "POST", body: formData });
+
+    if (response.ok) {
+      socket.emit('pfp_changed_notify', { newPfpUrl: result.url });
+    }
   } else {
     // user picked stock pfp
     response = await fetch("/api/register", {
@@ -837,7 +835,7 @@ function renderMessage(data) {
         extraInteractDiv.appendChild(deleteDiv);
     }
 
-    if (data.replyTo) {
+    if (data.replyto) {
         repliedStatus = true;
         const originalReplyMessageDiv = document.createElement("div");
         originalReplyMessageDiv.className = "original-reply-message-div";
@@ -845,16 +843,16 @@ function renderMessage(data) {
         originalReplyImg.src = "/images/icons/reply.svg";
         originalReplyImg.className = "original-reply-img";
         const originalReplyUsername = document.createElement("p");
-        originalReplyUsername.textContent = data.replyTo.username + ":";
+        originalReplyUsername.textContent = data.replyto.username + ":";
         originalReplyUsername.className = "original-reply-username";
         const originalReplyText = document.createElement("p");
-        originalReplyText.textContent = data.replyTo.message.slice(0, 20) + (data.replyTo.message.length > 20 ? "..." : "");
+        originalReplyText.textContent = data.replyto.message.slice(0, 20) + (data.replyto.message.length > 20 ? "..." : "");
         originalReplyText.className = "original-reply-text";
         originalReplyMessageDiv.appendChild(originalReplyImg);
         originalReplyMessageDiv.appendChild(originalReplyUsername);
         originalReplyMessageDiv.appendChild(originalReplyText);
         msgDiv.appendChild(originalReplyMessageDiv);
-        if (data.replyTo && data.replyTo.username === localStorage.getItem("username")){
+        if (data.replyto && data.replyto.username === localStorage.getItem("username")){
             yourOriginalReply = true;
             msgDiv.style.background = "rgba(0, 255, 0, 0.2)";
             msgDiv.style.borderRadius = "15px";
@@ -969,7 +967,7 @@ function showGlobalChat(data) {
         ruleAndInfoList.style.display = ruleAndInfoList.style.display === "none" ? "block" : "none";
     });
     const ruleAndInfoList = document.createElement("ul");
-    const rulesAndInfo = ["Be respectful to others", "No spamming or flooding the chat", "No hate speech or offensive language", "No sharing of personal information", "Follow the moderators' instructions", "Have fun and enjoy chatting!", "Chat history resets every 24 hours at midnight UTC"];
+    const rulesAndInfo = ["Be respectful to others", "No spamming or flooding the chat", "No hate speech or offensive language", "No sharing of personal information", "Follow the moderators' instructions", "Have fun and enjoy chatting!", "Chat history resets week at sunday midnight UTC"];
     ruleAndInfoList.className = "rules-info-list";
     ruleAndInfoList.style.listStyleType = "numbers";
     ruleAndInfoList.style.display = "none";
