@@ -351,7 +351,7 @@ io.use(async (socket, next) => {
     if (!rawToken) return next(new Error('Invalid token'));
 
     if (activeSessionCache.has(rawToken)) {
-      socket.user = activeSessionCache.get(RawToken);
+      socket.user = activeSessionCache.get(rawToken);
       return next;
     }
 
