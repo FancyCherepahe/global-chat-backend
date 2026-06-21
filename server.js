@@ -446,7 +446,7 @@ io.on('connection', (socket) => {
 
       // --- help command ---
       if (commandName === 'help') {
-        const userCommands = ['tell [username] [message]', 'setpfp [id]'];
+        const userCommands = ['tell [username] [message]', 'setpfp [id]/upload'];
         const modCommands = ['clear', 'kick [username]', 'ban [username]', 'unban [username]', 'mute [username]', 'unmute [username]'];
         const ownerCommands = ['setrole [username] [role]'];
         let commands = [...userCommands];
