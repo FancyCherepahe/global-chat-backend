@@ -25,6 +25,7 @@ const upload = multer({
   }
 });
 const app = express();
+const activeSessionCache = new Map();
 app.use(express.json());
 app.disable('x-powered-by');
 app.use('/uploads', express.static('uploads'));
@@ -337,6 +338,11 @@ io.use(async (socket, next) => {
     const rawToken = socket.handshake.auth?.token;
     if (!rawToken) return next(new Error('Invalid token'));
 
+    if (activeSessionCache.has(rawToken)) {
+      socket.user - activeSessionCache.get(RawToken);
+      return next;
+    }
+
     const r = await pool.query('SELECT * FROM users WHERE token=$1', [rawToken]);
     const user = r.rows[0];
     if (!user) return next(new Error('Invalid token'));
@@ -347,13 +353,17 @@ io.use(async (socket, next) => {
     const banCheck = await pool.query('SELECT 1 FROM bans WHERE username=$1 OR ip=$2 LIMIT 1', [user.username, ipHash]);
     if (banCheck.rows.length > 0 || user.role === 'banned') return next(new Error('You are banned'));
 
-    socket.user = {
+    const validatedUserData = {
       id: user.id,
       username: user.username,
       pfplink: user.pfplink,
       role: user.role,
       muteStatus: user.mutestatus
     };
+
+    activeSessionCache.set(rawToken, validatedUserData);
+
+    socket.user = validatedUserData
     return next();
   } catch (err) {
     console.error('Socket auth error', err);
@@ -369,8 +379,18 @@ const bannedTokens = new Set();
 io.on('connection', (socket) => {
   attachSocketRateLimiter(socket, { capacity: 5, refillInterval: 1000 });
 
+  let cachedHistory = null;
+  let lastCacheTime = 0
+  const CHACE_LIFETIME_MS = 2000;
+
   socket.on('request history', async () => {
     try {
+      const now = Date.now()
+      if (cachedHistory && (now - lastCacheTime) < CHACE_LIFETIME_MS){
+        socket.emit('chat history, cachedHistory')
+        return;
+      }
+
       const history = await pool.query('SELECT * FROM messages ORDER BY timestamp DESC LIMIT 100')
 
       const formattedHistory = history.rows.reverse().map(row => {
@@ -393,6 +413,9 @@ io.on('connection', (socket) => {
           replyto: parsedReply
         }
       });
+
+      cachedHistory = formattedHistory;
+      lastCacheTime = now;
 
       socket.emit('chat history', formattedHistory);
     } catch (err) {
@@ -529,6 +552,7 @@ if (commandName === 'setpfp') {
               s.emit('kicked user');
               s.disconnect(true);
               io.emit('system message', { text: `${target} was kicked by ${socket.user.username}` });
+              if (targetToken) activeSessionCache.delete(targetToken)
               break;
             }
           }
@@ -557,6 +581,8 @@ if (commandName === 'ban') {
 
   // 1. Update database role
   await pool.query('UPDATE users SET role=$1 WHERE username=$2', ['banned', target]);
+
+  if (targetToken) activeSessionCache.delete(targetToken)
 
   // 2. Find target's active socket to capture THEIR IP and disconnect them
   let targetIpHash = null;
