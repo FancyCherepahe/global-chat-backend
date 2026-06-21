@@ -68,10 +68,22 @@ function hashIp(ip) {
   return crypto.createHash('sha256').update((ip || '') + (process.env.IP_PEPPER || '')).digest('hex');
 }
 
+const authLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: true,
+  handler: (req, res) => {
+    res.json({ sucess: false, message: "Too many attemps to log in/ sign in"  })
+  }
+})
+
 // --- DB pool ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  max: 15,
+  connectionTimeoutMillis: 5000,
 });
 
 // --- Stickers (unchanged) ---
@@ -213,7 +225,7 @@ app.post("/api/setpfp-upload", upload.single("pfp"), async (req, res) => {
   }
 });
 // --- API: register ---
-app.post('/api/register', upload.single('pfp'),async (req, res) => {
+app.post('/api/register', authLimiter, upload.single('pfp'),async (req, res) => {
   try {
     const { username, password, pfplink } = req.body;
     if (!isValidUsername(username) || !password) return res.json({ success: false, message: 'Invalid input' });
@@ -226,7 +238,7 @@ app.post('/api/register', upload.single('pfp'),async (req, res) => {
     if (banCheck.rows.length > 0) return res.json({ success: false, message: 'You are banned from this chat' });
 
     const rawToken = uuidv4();
-    const passwordhash = await bcrypt.hash(password, 10);
+    const passwordhash = await bcrypt.hash(password, 8);
     const safePfp = req.file?`/uploads/${req.file.filename}`:req.body.pfplink; 
 
     await pool.query(
@@ -242,7 +254,7 @@ app.post('/api/register', upload.single('pfp'),async (req, res) => {
 });
 
 // --- API: login (rotate raw token) ---
-app.post('/api/login', async (req, res) => {
+app.post('/api/login',authLimiter,  async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) return res.json({ success: false, message: 'Invalid input' });
@@ -339,7 +351,7 @@ io.use(async (socket, next) => {
     if (!rawToken) return next(new Error('Invalid token'));
 
     if (activeSessionCache.has(rawToken)) {
-      socket.user - activeSessionCache.get(RawToken);
+      socket.user = activeSessionCache.get(RawToken);
       return next;
     }
 

@@ -13,10 +13,19 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
-const upload = multer({ dest: 'uploads/' ,
+const upload = multer({ 
+  dest: 'uploads/' ,
   limits: {fileSize: 2 * 1024 * 1024}, // 2MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('images/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
 });
 const app = express();
+const activeSessionCache = new Map();
 app.use(express.json());
 app.disable('x-powered-by');
 app.use('/uploads', express.static('uploads'));
@@ -117,7 +126,7 @@ async function ensureSchema() {
       pfplink TEXT,
       role TEXT,
       message TEXT,
-      replyTo TEXT,
+      replyto TEXT,
       timestamp TIMESTAMP DEFAULT NOW()
     )`
   )
@@ -156,11 +165,11 @@ function attachSocketRateLimiter(socket, { capacity = 5, refillInterval = 1000 }
       pfplink: user.pfplink,
       role: user.role,
       timeStamp: new Date().toISOString(),
-      replyTo: data.replyTo || null
+      replyto: data.replyto || null
     };
     io.emit('chat message', enriched);
-    const replyForDatabase = enriched.replyTo ? JSON.stringify(enriched.replyTo) : null;
-    pool.query('INSERT INTO messages (id, username, message, pfplink, role, replyTo) VALUES ($1, $2, $3, $4, $5, $6)', [enriched.messageId, enriched.username, enriched.message, user.pfplink, user.role, replyForDatabase]).catch(err => {
+    const replyForDatabase = enriched.replyto ? JSON.stringify(enriched.replyto) : null;
+    pool.query('INSERT INTO messages (id, username, message, pfplink, role, replyto) VALUES ($1, $2, $3, $4, $5, $6)', [enriched.messageId, enriched.username, enriched.message, user.pfplink, user.role, replyForDatabase]).catch(err => {
       console.error('Failed to save message to DB', err);
     })
   });
@@ -329,6 +338,11 @@ io.use(async (socket, next) => {
     const rawToken = socket.handshake.auth?.token;
     if (!rawToken) return next(new Error('Invalid token'));
 
+    if (activeSessionCache.has(rawToken)) {
+      socket.user - activeSessionCache.get(RawToken);
+      return next;
+    }
+
     const r = await pool.query('SELECT * FROM users WHERE token=$1', [rawToken]);
     const user = r.rows[0];
     if (!user) return next(new Error('Invalid token'));
@@ -339,13 +353,17 @@ io.use(async (socket, next) => {
     const banCheck = await pool.query('SELECT 1 FROM bans WHERE username=$1 OR ip=$2 LIMIT 1', [user.username, ipHash]);
     if (banCheck.rows.length > 0 || user.role === 'banned') return next(new Error('You are banned'));
 
-    socket.user = {
+    const validatedUserData = {
       id: user.id,
       username: user.username,
       pfplink: user.pfplink,
       role: user.role,
       muteStatus: user.mutestatus
     };
+
+    activeSessionCache.set(rawToken, validatedUserData);
+
+    socket.user = validatedUserData
     return next();
   } catch (err) {
     console.error('Socket auth error', err);
@@ -361,17 +379,27 @@ const bannedTokens = new Set();
 io.on('connection', (socket) => {
   attachSocketRateLimiter(socket, { capacity: 5, refillInterval: 1000 });
 
+  let cachedHistory = null;
+  let lastCacheTime = 0
+  const CHACE_LIFETIME_MS = 2000;
+
   socket.on('request history', async () => {
     try {
+      const now = Date.now()
+      if (cachedHistory && (now - lastCacheTime) < CHACE_LIFETIME_MS){
+        socket.emit('chat history, cachedHistory')
+        return;
+      }
+
       const history = await pool.query('SELECT * FROM messages ORDER BY timestamp DESC LIMIT 100')
 
       const formattedHistory = history.rows.reverse().map(row => {
         let parsedReply = null;
-        if (row.replyTo) {
+        if (row.replyto) {
           try {
-            parsedReply = JSON.parse(row.replyTo);
+            parsedReply = JSON.parse(row.replyto);
           } catch (err) {
-            console.error('Failed to parse replyTo', err);
+            console.error('Failed to parse replyto', err);
           }
         }
 
@@ -382,9 +410,12 @@ io.on('connection', (socket) => {
           role: row.role,
           message: row.message,
           timeStamp: row.timestamp,
-          replyTo: parsedReply
+          replyto: parsedReply
         }
       });
+
+      cachedHistory = formattedHistory;
+      lastCacheTime = now;
 
       socket.emit('chat history', formattedHistory);
     } catch (err) {
@@ -415,7 +446,7 @@ io.on('connection', (socket) => {
 
       // --- help command ---
       if (commandName === 'help') {
-        const userCommands = ['tell [username] [message]', 'setpfp [id]'];
+        const userCommands = ['tell [username] [message]', 'setpfp [id]/upload'];
         const modCommands = ['clear', 'kick [username]', 'ban [username]', 'unban [username]', 'mute [username]', 'unmute [username]'];
         const ownerCommands = ['setrole [username] [role]'];
         let commands = [...userCommands];
@@ -521,6 +552,7 @@ if (commandName === 'setpfp') {
               s.emit('kicked user');
               s.disconnect(true);
               io.emit('system message', { text: `${target} was kicked by ${socket.user.username}` });
+              if (targetToken) activeSessionCache.delete(targetToken)
               break;
             }
           }
@@ -549,6 +581,8 @@ if (commandName === 'ban') {
 
   // 1. Update database role
   await pool.query('UPDATE users SET role=$1 WHERE username=$2', ['banned', target]);
+
+  if (targetToken) activeSessionCache.delete(targetToken)
 
   // 2. Find target's active socket to capture THEIR IP and disconnect them
   let targetIpHash = null;
@@ -664,13 +698,14 @@ if (commandName === 'ban') {
   socket.on('delete message', async (data) => {
     try {
       if (!data || !data.messageId) return;
-      const targetMsg = chatHistory.find(m => m.messageId === data.messageId);
-      if (!targetMsg) return;
-      const r = await pool.query('SELECT role FROM users WHERE username=$1', [data.username]);
+      const targetMsg = await pool.query('SELECT * FROM messages WHERE id=$1', [data.messageId]);
+      if (!targetMsg.rows[0]) return;
+      const secureUsername  = socket.user?.username;
+      const r = await pool.query('SELECT role FROM users WHERE username=$1', [secureUsername]);
       const role = r.rows[0]?.role;
-      if (role === 'owner' || role === 'moderator' || targetMsg.username === data.username) {
-        chatHistory = chatHistory.filter(m => m.messageId !== data.messageId);
-        io.emit('delete message', { messageId: data.messageId });
+      if (role === 'owner' || role === 'moderator' || targetMsg.rows[0].username === secureUsername) {
+        await pool.query('DELETE FROM messages WHERE id=$1', [data.messageId])
+        io.emit("delete message", { messageId: data.messageId });
       }
     } catch (err) {
       console.error('Delete message error', err);
