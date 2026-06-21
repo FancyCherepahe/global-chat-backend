@@ -355,7 +355,11 @@ function initSocket() {
     console.warn("initSocket: no token found, aborting socket initialization");
     return;
   }
-  socket = io({ auth: { token: localStorage.getItem("chatToken") } });
+  socket = io("https://global-chat-uq6r.onrender.com/", { 
+    auth: { token: localStorage.getItem("chatToken") },
+    transports: ['websocket'],
+    upgrade: false
+   });
   
   try {
 

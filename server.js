@@ -35,11 +35,19 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://www.googletagmanager.com", "https://cdn.socket.io"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://cdn.socket.io"],
       styleSrc: ["'self'", "https:"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://cdn.socket.io"],
-      objectSrc: ["'none'"]
+      // 👇 Moved all the URLs here to connectSrc
+      connectSrc: [
+        "'self'", 
+        "https://cdn.socket.io", 
+        "wss://global-chat-uq6r.onrender.com", 
+        "https://global-chat-uq6r.onrender.com", 
+        "ws://localhost:3000", 
+        "http://localhost:3000"
+      ],
+      objectSrc: ["'none'"] 
     }
   }
 }));
