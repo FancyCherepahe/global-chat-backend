@@ -17,7 +17,7 @@ const upload = multer({
   dest: 'uploads/' ,
   limits: {fileSize: 2 * 1024 * 1024}, // 2MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('images/')) {
+    if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
       cb(new Error('Only image files are allowed!'), false);
@@ -360,7 +360,7 @@ io.use(async (socket, next) => {
 
     if (activeSessionCache.has(rawToken)) {
       socket.user = activeSessionCache.get(rawToken);
-      return next;
+      return next();
     }
 
     const r = await pool.query('SELECT * FROM users WHERE token=$1', [rawToken]);

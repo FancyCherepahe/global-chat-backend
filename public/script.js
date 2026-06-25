@@ -1,4 +1,5 @@
 let replyStatus = false;
+let selectedFile = null;
 let replyString = [];
 const morePfp = document.querySelector("#stock-pfp-choose");
 const signInForm = document.querySelector(".sign-in-form");
@@ -64,6 +65,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const savedToken = localStorage.getItem("chatToken");
   if (!savedToken) {
     // show sign-in form if no token
+    console.log("no token")
     signInForm.style.display = "flex";
     return;
   }
@@ -91,7 +93,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     // keep the same key (server may return token or not; prefer existing savedToken)
     if (result.user?.token) localStorage.setItem("chatToken", result.user.token);
     initSocket();
-    ("Autologin success, token:", localStorage.getItem("chatToken"));
+    console.log("Autologin success, token:", localStorage.getItem("chatToken"));
   } catch (err) {
     console.error("Auto-login failed:", err);
     signInForm.style.display = "flex";
@@ -191,15 +193,18 @@ customPfp.addEventListener('change', function(event) {
                 img.style.display = 'inline-block'; // stack side by side
                 
                 img.addEventListener('click', () => {
-          morePfp.src = img.src;
-          allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
-          setTimeout(() => {
-            allPfpCanvas.style.display = "none";
-            allPfpCanvas.style.animation = "none";
-            signInForm.style.animation = "fadeIn 0.7s forwards";
-            signInForm.style.display = "flex";
-          }, 700);
-        });
+                  
+                  morePfp.src = img.src;
+                  allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
+                  setTimeout(() => {
+                    allPfpCanvas.style.display = "none";
+                    allPfpCanvas.style.animation = "none";
+                    signInForm.style.animation = "fadeIn 0.7s forwards";
+                    signInForm.style.display = "flex";
+                  }, 700);
+                  
+                  
+                });
         customPfpPreview.appendChild(img);
             };
 
@@ -355,7 +360,7 @@ function initSocket() {
     console.warn("initSocket: no token found, aborting socket initialization");
     return;
   }
-  socket = io("https://global-chat-uq6r.onrender.com/", { 
+  socket = io({ 
     auth: { token: localStorage.getItem("chatToken") },
     transports: ['websocket'],
     upgrade: false
@@ -517,7 +522,7 @@ socket.on("kicked user", () => alert("You have been kicked!"));
     console.error("initSocket: threw error", err);
   }
   socket.on("connect", () => {
-  ("Socket connected:", socket.id);
+  console.log("Socket connected:", socket.id);
   socket.emit("register username", localStorage.getItem("username"));
 
   // Build UI synchronously
@@ -554,7 +559,7 @@ socket.on("kicked user", () => alert("You have been kicked!"));
      const input = document.querySelector("#messageInput")
      const sendButton = document.getElementById("sendButton")
      const stickerButton = document.getElementById("stickerButton")
-     if (input || uiButtons) {
+     if (input || sendButton) {
        input.disabled = true;
        sendButton.disabled = true;
        stickerButton.disabled = true;
@@ -588,9 +593,7 @@ async function saveUserData() {
 
     response = await fetch("/api/register", { method: "POST", body: formData });
 
-    if (response.ok) {
-      socket.emit('pfp_changed_notify', { newPfpUrl: result.url });
-    }
+    
   } else {
     // user picked stock pfp
     response = await fetch("/api/register", {
@@ -616,11 +619,6 @@ async function saveUserData() {
   alert("Register error");
 }
 
-}
-
-
-if (localStorage.getItem("chatToken")) {
-    initSocket();
 }
 
 async function signInLastSavedAccount() {
