@@ -752,7 +752,7 @@ justify-content: center;
     gap: 10px;
     background: none;
     border: none;
-    text-wrap: nowrap;
+    text-wrap: nowrap
 }
 
 .log-out-img{
