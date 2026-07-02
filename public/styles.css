@@ -733,6 +733,17 @@ footer{
     gap: 10px;
 }
 
+#interactiveStuffDiv{
+    
+justify-content: center;
+  align-items: center;
+  align-content: center;
+  display: flex;
+  flex-direction: row;
+  gap: 20px
+}
+
+
 .log-out-button{
     display: flex;
     flex-direction: row;
@@ -741,6 +752,7 @@ footer{
     gap: 10px;
     background: none;
     border: none;
+    text-wrap: nowrap;
 }
 
 .log-out-img{
@@ -828,4 +840,24 @@ footer{
 
 .account-pfp{
     width: 150px;
+}
+
+.change-pfp-button{
+    background: linear-gradient(180deg, #401A78 0%, #0B042C 99.52%);
+    border: 5px solid #000000;
+    border-radius: 39px;
+
+    width: fit-content;
+    height: fit-content;
+
+    font-size: large;
+    text-wrap: nowrap;
+
+    padding: 2.5% 3% 2.5% 3%;
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    transition: all 0.3s ease-in-out, filter 0.3s ease-in-out;
 }
