@@ -28,6 +28,26 @@ const allPfp = [{link: "/images/stock-pfp/uzi-pfp.png", text: "UZI", text_color:
                 {link: "/images/stock-pfp/doll-pfp.png", text: "Doll", text_color: "#FF0000", id: 6},
                 {link: "/images/stock-pfp/absolute-solver-pfp.png", text: "Absolute Solver", text_color: "linear-gradient(90deg, #9F43A1 0%, #FF0000 100%)", id: 7}]
 
+function clearReplyState() {
+    replyStatus = false;
+    replyString = [];
+    
+    const msgInput = document.getElementById("messageInput");
+    if (msgInput) {
+        msgInput.placeholder = "Type here"; // Matches your default placeholder
+    }
+
+    // Call your built-in clean-up function to fix background colors & internal states
+    if (typeof globalThis.globalHideExtra === "function") {
+        globalThis.globalHideExtra();
+    }
+
+    // Fallback: hide any lingering menus
+    document.querySelectorAll(".extra-interact-div").forEach(el => {
+        el.style.display = "none";
+    });
+}
+
 function sendMessage(inputElement) {
   if(!inputElement) return;
   const message = inputElement.value.trim();
@@ -447,7 +467,10 @@ function initSocket() {
         sendIcon.className = "send-icon";
         sendButton.appendChild(sendIcon);
         sendButton.className = "send-message-button";
-        sendButton.addEventListener("click", () => sendMessage(messageInput));
+        sendButton.addEventListener("click",  () => {
+        sendMessage(messageInput);
+        clearReplyState(); 
+    });
 
         uiDiv.appendChild(messageInput);
         uiDiv.appendChild(sendButton);
@@ -727,6 +750,8 @@ function renderMessage(data) {
         msgDiv.style.padding = "2px";
     }
 
+    globalThis.globalHideExtra = hideExtra;
+
     let  extraVisible = false;
 
     function extraChanges() {
@@ -996,7 +1021,7 @@ function showGlobalChat(data) {
     changePfpInput.id = "changePfpInput";
     changePfpInput.style.display = "none";
     changePfpInput.className = "change-pfp-input";
-    changePfpLabel.we
+    changePfpLabel.appendChild(changePfpInput);
     changePfpInput.onchange = function(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -1070,8 +1095,16 @@ function showGlobalChat(data) {
     sendButton.addEventListener("click",  () => {
         sendMessage(messageInput)
         replyStatus = false;
+        
         const msgInput = document.getElementById("messageInput");
         msgInput.placeholder = `Text here`;
+ const elements = document.querySelectorAll(".extra-interact-div");
+
+elements.forEach(el => {
+  el.style.display = "none";
+});
+
+        
     });
 
     const stickerButton = document.createElement("button");
@@ -1238,10 +1271,11 @@ socket.on('trigger pfp file picker', () => {
 
 document.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
-        sendMessage(document.getElementById("messageInput"));
-        replyStatus = false;
         const msgInput = document.getElementById("messageInput");
-        msgInput.placeholder = `Text here`;
-        msgInput.value = ""
+        if (msgInput && document.activeElement === msgInput) { 
+            sendMessage(msgInput);
+            clearReplyState(); 
+            msgInput.value = "";
+        }
     }
 });

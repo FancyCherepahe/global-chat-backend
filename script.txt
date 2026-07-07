@@ -120,16 +120,32 @@ function showOnPage() {
         customPfpImg.src = "/images/icons/download.svg";
         customPfpImg.className = "download-img";
         const customPfpPreview = document.createElement("div");
-        customPfpPreview.addEventListener("click", (file, e) => {
-                morePfp.src = e.target.result;
-                allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
-                setTimeout(() => {
-                    allPfpCanvas.style.display = "none";
-                    allPfpCanvas.style.animation = "none";
-                    signInForm.style.animation = "fadeIn 0.7s forwards";
-                    signInForm.style.display = "flex";
-                }, 700);
-            });
+       customPfp.onload = function(e) {
+    const img = document.createElement('img');
+    img.src = e.target.result; // This 'e' comes from the FileReader onload
+    img.alt = 'image preview';
+    img.style.maxWidth = '200px';
+    img.style.margin = '10px';
+    img.style.display = 'inline-block';
+    img.style.cursor = 'pointer'; // Good practice to show it's clickable
+
+    // Attach the click listener directly to the img
+    img.addEventListener('click', (event) => {
+        // Use 'event.target.src' because it's the clicked image
+        morePfp.src = event.target.src; 
+        
+        allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
+        setTimeout(() => {
+            allPfpCanvas.style.display = "none";
+            allPfpCanvas.style.animation = "none";
+            signInForm.style.animation = "fadeIn 0.7s forwards";
+            signInForm.style.display = "flex";
+        }, 700);
+    });
+
+    customPfpPreview.innerHTML = ''; // Clear previous preview
+    customPfpPreview.appendChild(img);
+};
         customPfpDiv.appendChild(customPfp);
         customPfpDiv.appendChild(customPfpUploadButton);
         customPfpDiv.appendChild(customPfpPreview);
@@ -178,41 +194,66 @@ function showOnPage() {
         allPfpCanvas.appendChild(stockPfpDiv)
        
 customPfp.addEventListener('change', function(event) {
-    const files = event.target.files;
+    const file = event.target.files[0]; // Get the single file
+    if (!file) return;
 
-    Array.from(files).forEach(file => {
-        if (file.type.startsWith('image/')) { 
-            const reader = new FileReader();
+    // 1. Upload Logic
+    const formData = new FormData();
+    formData.append("pfp", file);
+    formData.append("token", localStorage.getItem("chatToken"));
 
-            reader.onload = function(e) {
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.alt = 'image preview';
-                img.style.maxWidth = '200px';
-                img.style.margin = '10px';
-                img.style.display = 'inline-block'; // stack side by side
-                
-                img.addEventListener('click', () => {
-                  
-                  morePfp.src = img.src;
-                  allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
-                  setTimeout(() => {
+    fetch("/api/setpfp-upload", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert("Profile picture uploaded successfully!");
+        } else {
+            alert(result.message || "Upload failed");
+        }
+    })
+    .catch(err => {
+        console.error("Upload error:", err);
+        alert("An error occurred during file upload.");
+    });
+
+    // 2. Preview Logic
+    if (file.type.startsWith('image/')) { 
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            // Check if preview container exists before appending
+            if (!customPfpPreview) return;
+            
+            // Clear previous preview if you want to replace it
+            customPfpPreview.innerHTML = ''; 
+
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = 'image preview';
+            img.style.maxWidth = '200px';
+            img.style.margin = '10px';
+            
+            img.addEventListener('click', () => {
+                morePfp.src = img.src;
+                allPfpCanvas.style.animation = "fadeOut 0.7s forwards";
+                setTimeout(() => {
                     allPfpCanvas.style.display = "none";
                     allPfpCanvas.style.animation = "none";
                     signInForm.style.animation = "fadeIn 0.7s forwards";
                     signInForm.style.display = "flex";
-                  }, 700);
-                  
-                  
-                });
-        customPfpPreview.appendChild(img);
-            };
+                }, 700);
+            });
+            
+            customPfpPreview.appendChild(img);
+        };
 
-            reader.readAsDataURL(file);
-        } else {
-            alert('Please select only image files.');
-        }
-    });
+        reader.readAsDataURL(file);
+    } else {
+        alert('Please select only image files.');
+    }
 });
         main.appendChild(allPfpCanvas);
 signInForm.style.animation = "fadeOut 0.7s forwards";
@@ -360,7 +401,7 @@ function initSocket() {
     console.warn("initSocket: no token found, aborting socket initialization");
     return;
   }
-  socket = io("https://global-chat-uq6r.onrender.com/", { 
+  socket = io({ 
     auth: { token: localStorage.getItem("chatToken") },
     transports: ['websocket'],
     upgrade: false
@@ -559,7 +600,7 @@ socket.on("kicked user", () => alert("You have been kicked!"));
      const input = document.querySelector("#messageInput")
      const sendButton = document.getElementById("sendButton")
      const stickerButton = document.getElementById("stickerButton")
-     if (input || uiButtons) {
+     if (input || sendButton) {
        input.disabled = true;
        sendButton.disabled = true;
        stickerButton.disabled = true;
@@ -576,32 +617,24 @@ socket.on("kicked user", () => alert("You have been kicked!"));
 async function saveUserData() {
   const username = usernameInput.value.trim();
   const password = passwordInput.value.trim();
-  const pfplink = morePfp.src;
+  const customPfp = document.getElementById("customPfp");
+  const file = customPfp.files[0]
   if (!username || !password) {
     alert("Please fill in all fields.");
     return;
   }
+  const formData = new FormData();
+  formData.append("username", username);
+  formData.append("password", password);
+  if (file) {
+    formData.append("pfp", file);
+  }
 
-  try {
-  let response;
-  if (customPfp.files.length > 0) {
-    // user uploaded a file
-    const formData = new FormData();
-    formData.append("username", username);
-    formData.append("password", password);
-    formData.append("pfp", customPfp.files[0]);
 
     response = await fetch("/api/register", { method: "POST", body: formData });
 
     
-  } else {
-    // user picked stock pfp
-    response = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, pfplink })
-    });
-  }
+
 
   const result = await response.json();
   if (result.success) {
@@ -614,12 +647,9 @@ async function saveUserData() {
   } else {
     alert("Error: " + result.message);
   }
-} catch (err) {
-  console.error("Register error:", err);
-  alert("Register error");
 }
 
-}
+
 
 async function signInLastSavedAccount() {
   const username = usernameInput.value.trim();
@@ -696,6 +726,8 @@ function renderMessage(data) {
         msgDiv.style.border = "none";
         msgDiv.style.padding = "2px";
     }
+
+    globalThis.globalHideExtra = hideExtra;
 
     let  extraVisible = false;
 
@@ -912,6 +944,7 @@ function showGlobalChat(data) {
     savedAccountDiv.appendChild(nonInteractiveStuffDiv);
     const interactiveStuffDiv = document.createElement("div");
     interactiveStuffDiv.className = "non-interaction-stuff-div";
+    interactiveStuffDiv.id = "interactiveStuffDiv";
     const logOutButton = document.createElement("button");
     logOutButton.className = "log-out-button";
     logOutButton.addEventListener("click", () => {
@@ -954,8 +987,49 @@ function showGlobalChat(data) {
     logOutButtonText.textContent = "Log Out";
     logOutButton.appendChild(logOutButtonText);
     interactiveStuffDiv.appendChild(logOutButton);
-    savedAccountDiv.appendChild(interactiveStuffDiv)
-    
+    savedAccountDiv.appendChild(interactiveStuffDiv);
+
+    const changePfpLabel = document.createElement("div");
+    changePfpLabel.textContent = "";
+    changePfpLabel.className = "change-pfp-label";
+    const changePfpInput = document.createElement("input");
+    changePfpInput.type = "file";
+    changePfpInput.accept = "image/*";
+    changePfpInput.id = "changePfpInput";
+    changePfpInput.style.display = "none";
+    changePfpInput.className = "change-pfp-input";
+    changePfpLabel.appendChild(changePfpInput);
+    changePfpInput.onchange = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File is too large. Max size is 5MB.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const buffer = e.target.result;
+
+        socket.emit("upload custom pfp", {
+          fileName: file.name,
+          fileData: buffer,
+        });
+
+        
+      };
+      reader.readAsArrayBuffer(file)
+    }
+    const changePfpButton = document.createElement("button");
+    changePfpButton.className = "change-pfp-button";
+    changePfpButton.textContent = "Change Profile Picture";
+    changePfpButton.addEventListener("click", () => {
+      changePfpInput.click();
+    });
+    changePfpLabel.appendChild(changePfpInput);
+    interactiveStuffDiv.appendChild(changePfpLabel);
+    interactiveStuffDiv.appendChild(changePfpButton);
     const globalChatDiv = document.createElement("div");
     globalChatDiv.className = "global-chat";
     globalChatDiv.appendChild(allMessagesDiv);
@@ -998,8 +1072,16 @@ function showGlobalChat(data) {
     sendButton.addEventListener("click",  () => {
         sendMessage(messageInput)
         replyStatus = false;
+        
         const msgInput = document.getElementById("messageInput");
         msgInput.placeholder = `Text here`;
+ const elements = document.querySelectorAll(".extra-interact-div");
+
+elements.forEach(el => {
+  el.style.display = "none";
+});
+
+        
     });
 
     const stickerButton = document.createElement("button");

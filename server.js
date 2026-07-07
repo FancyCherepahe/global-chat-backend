@@ -42,12 +42,11 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://cdn.socket.io"],
       styleSrc: ["'self'", "https:"],
       imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://global-chat.132.145.45.211.sslip.io"],
-      // 👇 Moved all the URLs here to connectSrc
       connectSrc: [
         "'self'", 
         "https://cdn.socket.io", 
-        "wss://global-chat-uq6r.onrender.com", 
-        "https://global-chat-uq6r.onrender.com", 
+        "wss://global-chat.132.145.45.211.sslip.io", 
+        "https:://global-chat.132.145.45.211.sslip.io", 
         "ws://localhost:5000", 
         "http://localhost:5000"
       ],
@@ -58,7 +57,7 @@ app.use(helmet({
 
 // --- CORS: adjust origin to your frontend(s) ---
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://global-chat-uq6r.onrender.com'],
+  origin: ['http://localhost:3000', 'https://global-chat.132.145.45.211.sslip.io'],
   methods: ['GET', 'POST'],
   credentials: true
 }));
@@ -394,7 +393,7 @@ app.get('/api/messages', (req, res) => res.json({ message: 'Hello from GlobalCha
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'https://global-chat-uq6r.onrender.com'],
+    origin: ['http://localhost:3000', 'https://global-chat.132.145.45.211.sslip.io'],
     methods: ['GET', 'POST']
   }
 });
