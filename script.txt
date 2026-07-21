@@ -19,7 +19,6 @@ document.getElementById('sign-in').addEventListener('click', signInLastSavedAcco
 
 document.getElementById('create-account').addEventListener('click', saveUserData);
 
-
 const allPfp = [{link: "/images/stock-pfp/uzi-pfp.png", text: "UZI", text_color: "#080741", id: 1},
                 {link: "/images/stock-pfp/n-pfp.png", text: "SD-N", text_color: "#51FF00", id: 2},
                 {link: "/images/stock-pfp/v-pfp.png", text: "SD-V", text_color: "#00FFF2", id: 3},
@@ -27,6 +26,26 @@ const allPfp = [{link: "/images/stock-pfp/uzi-pfp.png", text: "UZI", text_color:
                 {link: "/images/stock-pfp/lizzie-pfp.png", text: "Lizzie", text_color: "#E695C3", id: 5},
                 {link: "/images/stock-pfp/doll-pfp.png", text: "Doll", text_color: "#FF0000", id: 6},
                 {link: "/images/stock-pfp/absolute-solver-pfp.png", text: "Absolute Solver", text_color: "linear-gradient(90deg, #9F43A1 0%, #FF0000 100%)", id: 7}]
+
+function clearReplyState() {
+    replyStatus = false;
+    replyString = [];
+    
+    const msgInput = document.getElementById("messageInput");
+    if (msgInput) {
+        msgInput.placeholder = "Type here"; // Matches your default placeholder
+    }
+
+    // Call your built-in clean-up function to fix background colors & internal states
+    if (typeof globalThis.globalHideExtra === "function") {
+        globalThis.globalHideExtra();
+    }
+
+    // Fallback: hide any lingering menus
+    document.querySelectorAll(".extra-interact-div").forEach(el => {
+        el.style.display = "none";
+    });
+}
 
 function sendMessage(inputElement) {
   if(!inputElement) return;
@@ -447,7 +466,10 @@ function initSocket() {
         sendIcon.className = "send-icon";
         sendButton.appendChild(sendIcon);
         sendButton.className = "send-message-button";
-        sendButton.addEventListener("click", () => sendMessage(messageInput));
+        sendButton.addEventListener("click",  () => {
+        sendMessage(messageInput);
+        clearReplyState(); 
+    });
 
         uiDiv.appendChild(messageInput);
         uiDiv.appendChild(sendButton);
@@ -458,6 +480,23 @@ socket.on("disconnect", (reason) => {
     socketInitialized = false;
     socket = undefined;
   });
+
+
+socket.on("user typing", (data) => {
+  const typingElement = document.getElementById("typing-indicator");
+  if (typingElement) {
+    typingElement.textContent = `${data.username} is typing...`;
+    typingElement.classList.remove("hidden");
+  }
+});
+
+socket.on("user stopped typing", (data) => {
+  const typingElement = document.getElementById("typing-indicator");
+  if (typingElement) {
+    typingElement.textContent = "";
+    typingElement.classList.add("hidden");
+  }
+});
 
   socket.on("connect_error", (err) => {
     console.error("initSocket: connect_error", err);
@@ -1055,11 +1094,27 @@ function showGlobalChat(data) {
     rulesAndSystemInfoDiv.appendChild(rulesTitle);
     rulesAndSystemInfoDiv.appendChild(ruleAndInfoList);
     
+    let isTypingEmmited = false;
+    let typingTimeout = null;
+    const TYPING_TIMER_LENGTH = 2000;
+
     const messageInput = document.createElement("input");
     messageInput.type = "text";
     messageInput.placeholder = "Type here";
     messageInput.className = "info-input";
     messageInput.id = "messageInput";
+    messageInput.addEventListener("input", () => {
+      if (!isTypingEmmited) {
+        socket.emit("typing");
+        isTypingEmmited = true;
+
+        clearTimeout(typingTimeout);
+
+        typingTimeout = setTimeout(() => {
+          isTypingemmited = false;
+        }, TYPING_TIMER_LENGTH);
+      }
+    });
     messageInput.maxlength = 500;
     
     const sendButton = document.createElement("button");
@@ -1192,6 +1247,23 @@ stickerPacks.forEach((pack, index) => {
     });
     stickerButton.appendChild(stickerIcon);
 
+    const typingIndicator = document.createElement("p");
+    typingIndicator.id = "typingIndicator";
+    typingIndicator.textContent = "";
+    typingIndicator.className = "typing-indicator";
+    globalChatDiv.appendChild(typingIndicator);
+
+    socket.on("typing user", (data) => {
+        const typingIndicator = document.getElementById("typingIndicator");
+        if (data.username !== localStorage.getItem("username")) {
+            typingIndicator.textContent = `${data.username} is typing...`;
+            clearTimeout(window.typingTimer);
+              window.typingTimer = setTimeout(() => {
+              typingIndicator.textContent = "";
+            }, 2000);
+        }
+    });
+
     const uiDiv = document.createElement("div");
     uiDiv.appendChild(messageInput);
     uiDiv.appendChild(stickerButton);
@@ -1248,10 +1320,11 @@ socket.on('trigger pfp file picker', () => {
 
 document.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
-        sendMessage(document.getElementById("messageInput"));
-        replyStatus = false;
         const msgInput = document.getElementById("messageInput");
-        msgInput.placeholder = `Text here`;
-        msgInput.value = ""
+        if (msgInput && document.activeElement === msgInput) { 
+            sendMessage(msgInput);
+            clearReplyState(); 
+            msgInput.value = "";
+        }
     }
 });

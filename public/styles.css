@@ -861,3 +861,9 @@ justify-content: center;
 
     transition: all 0.3s ease-in-out, filter 0.3s ease-in-out;
 }
+
+.online-users{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

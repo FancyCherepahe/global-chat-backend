@@ -46,7 +46,7 @@ app.use(helmet({
         "'self'", 
         "https://cdn.socket.io", 
         "wss://global-chat.132.145.45.211.sslip.io", 
-        "https:://global-chat.132.145.45.211.sslip.io", 
+        "https://global-chat.132.145.45.211.sslip.io", 
         "ws://localhost:5000", 
         "http://localhost:5000"
       ],
@@ -197,6 +197,8 @@ function attachSocketRateLimiter(socket, { capacity = 5, refillInterval = 1000 }
     })
   });
 }
+
+let onlineUsers = [];
 
 app.post("/api/setpfp-upload", async (req, res) => {
   try {
@@ -453,7 +455,7 @@ io.on('connection', (socket) => {
     try {
       const now = Date.now()
       if (cachedHistory && (now - lastCacheTime) < CHACE_LIFETIME_MS){
-        socket.emit('chat history, cachedHistory')
+        socket.emit('chat history', cachedHistory)
         return;
       }
 
@@ -489,8 +491,13 @@ io.on('connection', (socket) => {
     }
   });
 
+  
+
   socket.on('register username', (username) => {
     socket.username = username;
+    onlineUsers.push(username)
+    let filteredOnlineUsers = [...new Set(onlineUsers)]
+    io.emit("update online users", { users: filteredOnlineUsers });
   });
 
   socket.on('upload custom pfp', async (data)=> {
@@ -833,8 +840,20 @@ if (commandName === 'ban') {
   });
 
   socket.on('disconnect', () => {
-    // nothing special
+    if (socket.username) {
+      onlineUsers = onlineUsers.filter(u => u !== socket.username);
+      let filteredOnlineUsers = [...new Set(onlineUsers)]
+      io.emit("update online users", { users: filteredOnlineUsers });
+    }
   });
+
+  socket.on('typing', () => {
+    socket.broadcast.emit("user typing", { username: socket.user.username})
+  })
+
+   socket.on('stop typing', () => {
+    socket.broadcast.emit("user stopped typing", { username: socket.user.username})
+  })
   // Backend (server.txt) socket listener:
 socket.on('pfp_changed_notify', (data) => {
     // Broadcast to everyone else that this socket's user has a new avatar

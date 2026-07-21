@@ -19,7 +19,6 @@ document.getElementById('sign-in').addEventListener('click', signInLastSavedAcco
 
 document.getElementById('create-account').addEventListener('click', saveUserData);
 
-
 const allPfp = [{link: "/images/stock-pfp/uzi-pfp.png", text: "UZI", text_color: "#080741", id: 1},
                 {link: "/images/stock-pfp/n-pfp.png", text: "SD-N", text_color: "#51FF00", id: 2},
                 {link: "/images/stock-pfp/v-pfp.png", text: "SD-V", text_color: "#00FFF2", id: 3},
@@ -481,6 +480,23 @@ socket.on("disconnect", (reason) => {
     socketInitialized = false;
     socket = undefined;
   });
+
+
+socket.on("user typing", (data) => {
+  const typingElement = document.getElementById("typing-indicator");
+  if (typingElement) {
+    typingElement.textContent = `${data.username} is typing...`;
+    typingElement.classList.remove("hidden");
+  }
+});
+
+socket.on("user stopped typing", (data) => {
+  const typingElement = document.getElementById("typing-indicator");
+  if (typingElement) {
+    typingElement.textContent = "";
+    typingElement.classList.add("hidden");
+  }
+});
 
   socket.on("connect_error", (err) => {
     console.error("initSocket: connect_error", err);
@@ -1050,11 +1066,22 @@ function showGlobalChat(data) {
     changePfpButton.addEventListener("click", () => {
       changePfpInput.click();
     });
+     
+    
+    const onlineUsers = document.createElement("p");
+    onlineUsers.className = "online-users";
+    onlineUsers.textContent = "🟢 ";
+    socket.on("update online users", (data) => {
+      onlineUsers.textContent = `🟢 ${data.users.length} Users`;
+    })
     changePfpLabel.appendChild(changePfpInput);
     interactiveStuffDiv.appendChild(changePfpLabel);
     interactiveStuffDiv.appendChild(changePfpButton);
+   
+    
     const globalChatDiv = document.createElement("div");
     globalChatDiv.className = "global-chat";
+    globalChatDiv.appendChild(onlineUsers);
     globalChatDiv.appendChild(allMessagesDiv);
     
     const rulesAndSystemInfoDiv = document.createElement("div");
@@ -1078,11 +1105,28 @@ function showGlobalChat(data) {
     rulesAndSystemInfoDiv.appendChild(rulesTitle);
     rulesAndSystemInfoDiv.appendChild(ruleAndInfoList);
     
+    let isTypingEmmited = false;
+    let typingTimeout = null;
+    const TYPING_TIMER_LENGTH = 2000;
+
     const messageInput = document.createElement("input");
     messageInput.type = "text";
     messageInput.placeholder = "Type here";
     messageInput.className = "info-input";
     messageInput.id = "messageInput";
+    messageInput.addEventListener("input", () => {
+      if (!isTypingEmmited) {
+        socket.emit("typing");
+        isTypingEmmited = true;
+
+        clearTimeout(typingTimeout);
+
+        typingTimeout = setTimeout(() => {
+          isTypingEmmited = false;
+          socket.emit("stop typing");
+        }, TYPING_TIMER_LENGTH);
+      }
+    });
     messageInput.maxlength = 500;
     
     const sendButton = document.createElement("button");
@@ -1214,6 +1258,23 @@ stickerPacks.forEach((pack, index) => {
         }
     });
     stickerButton.appendChild(stickerIcon);
+
+    const typingIndicator = document.createElement("p");
+    typingIndicator.id = "typingIndicator";
+    typingIndicator.textContent = "";
+    typingIndicator.className = "typing-indicator";
+    globalChatDiv.appendChild(typingIndicator);
+
+    socket.on("user typing", (data) => {
+        const typingIndicator = document.getElementById("typingIndicator");
+        if (data.username !== localStorage.getItem("username")) {
+            typingIndicator.textContent = `${data.username} is typing...`;
+            clearTimeout(window.typingTimer);
+              window.typingTimer = setTimeout(() => {
+              typingIndicator.textContent = "";
+            }, 2000);
+        }
+    });
 
     const uiDiv = document.createElement("div");
     uiDiv.appendChild(messageInput);
